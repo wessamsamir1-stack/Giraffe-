@@ -245,6 +245,64 @@ class ItemsRepository {
     });
   }
 
+  /// تحديث بيانات المنتج بعد ما المستخدم يراجع اقتراحات الذكاء الاصطناعي.
+  Future<String?> update({
+    required String itemId,
+    String? title,
+    String? description,
+    String? categoryId,
+    String? subCategoryId,
+    ItemCondition? condition,
+    String? brand,
+    String? model,
+    double? valueMin,
+    double? valueMax,
+    double? aiConfidence,
+    int? comparableCount,
+    double? willPayUpTo,
+    bool? acceptsCashDiff,
+    ItemStatus? status,
+    List<String>? wantedCategoryIds,
+  }) async {
+    if (!hasBackend) return null;
+
+    try {
+      await _client.from('items').update({
+        if (title != null) 'title': title.trim(),
+        if (description != null) 'description': description.trim(),
+        if (categoryId != null) 'category_id': categoryId,
+        if (subCategoryId != null) 'subcategory_id': subCategoryId,
+        if (condition != null) 'condition': condition.wire,
+        if (brand != null) 'brand': brand,
+        if (model != null) 'model': model,
+        if (valueMin != null) 'value_min': valueMin,
+        if (valueMax != null) 'value_max': valueMax,
+        if (aiConfidence != null) 'ai_confidence': aiConfidence,
+        if (comparableCount != null) 'comparable_count': comparableCount,
+        if (willPayUpTo != null) 'will_pay_up_to': willPayUpTo,
+        if (acceptsCashDiff != null) 'accepts_cash_diff': acceptsCashDiff,
+        if (status != null) 'status': status.wire,
+      }).eq('id', itemId);
+
+      if (wantedCategoryIds != null) {
+        await _client
+            .from('item_wanted_categories')
+            .delete()
+            .eq('item_id', itemId);
+
+        if (wantedCategoryIds.isNotEmpty) {
+          await _client.from('item_wanted_categories').insert([
+            for (final categoryId in wantedCategoryIds)
+              {'item_id': itemId, 'category_id': categoryId},
+          ]);
+        }
+      }
+      return null;
+    } catch (_) {
+      return 'common.error';
+    }
+  }
+
   Future<void> updateStatus(String itemId, ItemStatus status) async {
     if (!hasBackend) return;
     await _client

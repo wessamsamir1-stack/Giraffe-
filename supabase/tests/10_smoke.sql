@@ -593,4 +593,260 @@ begin
   perform public.assert_eq(n, 0, 'RLS مفعّل على كل الجداول');
 end $$;
 
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 16. الذكاء الاصطناعي: الميزانية والتقدير والفحص'; end $$;
+-- =============================================================================
+do $$
+declare
+  quota  jsonb;
+  screen jsonb;
+  est    jsonb;
+  n      int;
+begin
+  -- الميزانية متاحة لمستخدم جديد
+  quota := public.ai_quota_check('11111111-1111-1111-1111-111111111111');
+  perform public.assert_eq((quota->>'allowed')::boolean, true,
+    'الميزانية متاحة في البداية');
+
+  -- تعدية سقف المستخدم
+  insert into public.ai_jobs (user_id, kind, status, cost_cents)
+  values ('11111111-1111-1111-1111-111111111111', 'analyze_item', 'done', 40);
+
+  quota := public.ai_quota_check('11111111-1111-1111-1111-111111111111');
+  perform public.assert_eq(quota->>'reason', 'user_budget_exceeded',
+    'سقف التكلفة اليومي بيتفرض');
+
+  -- الفحص المبدئي: منتج نضيف
+  screen := public.prescreen_item('aaaaaaaa-0000-0000-0000-000000000002');
+  perform public.assert_eq(screen->>'decision', 'approved',
+    'الآيفون عدّى الفحص المبدئي');
+
+  -- الفحص المبدئي: منتج ممنوع
+  update public.items
+     set title = 'مسدس للبيع'
+   where id = 'aaaaaaaa-0000-0000-0000-000000000003';
+
+  screen := public.prescreen_item('aaaaaaaa-0000-0000-0000-000000000003');
+  perform public.assert_eq(screen->>'decision', 'rejected',
+    'السلاح اترفض قبل ما ننادي أي موديل');
+
+  -- التقدير من المقارنات — مفيش بيانات لسه
+  est := public.estimate_from_comparables('EG', 'mobiles', 'mobiles.phones',
+                                          'Apple', 'iPhone 15 Pro', 'like_new');
+  perform public.assert_true(est is null,
+    'مفيش تقدير من غير مقارنات كفاية — والحافة هي اللي بتنادي النموذج');
+
+  -- نغذّي مقارنات كفاية
+  insert into public.price_comparables
+    (country_code, category_id, subcategory_id, brand, model, condition,
+     value_min, value_max, sample_size, source)
+  select 'EG', 'mobiles', 'mobiles.phones', 'Apple', 'iPhone 15 Pro',
+         'like_new', 38000, 44000, 3, 'seeded'
+    from generate_series(1, 3);
+
+  est := public.estimate_from_comparables('EG', 'mobiles', 'mobiles.phones',
+                                          'Apple', 'iPhone 15 Pro', 'like_new');
+  perform public.assert_true(est is not null, 'التقدير بيطلع من مقارناتنا');
+  perform public.assert_eq(est->>'source', 'comparables_model',
+    'المصدر: مطابقة الموديل');
+  perform public.assert_true((est->>'confidence')::numeric >= 0.9,
+    'ثقة عالية للمطابقة الدقيقة');
+
+  -- الاعتماد بينشر المنتج
+  update public.items set moderation = 'pending', status = 'pending'
+   where id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+  perform public.apply_moderation('aaaaaaaa-0000-0000-0000-000000000002',
+                                  'approved');
+
+  select count(*)::int into n from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-000000000002'
+     and status = 'available' and published_at is not null;
+  perform public.assert_eq(n, 1, 'الاعتماد نشر المنتج');
+
+  -- الرفض بيبلّغ صاحبه
+  perform public.apply_moderation('aaaaaaaa-0000-0000-0000-000000000003',
+                                  'rejected', 'سلاح');
+
+  select count(*)::int into n from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-000000000003' and status = 'rejected';
+  perform public.assert_eq(n, 1, 'المنتج الممنوع اترفض');
+
+  perform public.assert_true(
+    exists (select 1 from public.notifications
+             where kind = 'system' and title_ar like '%اترفض%'),
+    'صاحب المنتج المرفوض اتبلّغ بالسبب');
+
+  -- التعلّم من الصفقات المكتملة
+  select count(*)::int into n from public.price_comparables
+   where source = 'internal';
+
+  perform public.learn_from_completed_trade(
+    (select id from public.matches where stage = 'completed' limit 1));
+
+  perform public.assert_true(
+    (select count(*)::int from public.price_comparables
+      where source = 'internal') > n,
+    'الصفقة المكتملة غذّت جدول المقارنات');
+end $$;
+
+
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 17. حارس الفحص — المستخدم مايعتمدش نفسه'; end $$;
+-- =============================================================================
+
+-- تجهيز بصلاحيات الخادم: منتج معتمد لوسام، ومنتج مرفوض ليه كمان
+do $$
+begin
+  update public.items
+     set status = 'pending', moderation = 'pending', published_at = null
+   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+  perform public.apply_moderation('aaaaaaaa-0000-0000-0000-000000000001',
+                                  'approved');
+
+  insert into public.items
+    (id, owner_id, title, category_id, currency_code, country_code, city_id,
+     status, moderation)
+  values
+    ('aaaaaaaa-0000-0000-0000-0000000000e1',
+     '11111111-1111-1111-1111-111111111111',
+     'منتج اترفض', 'mobiles', 'EGP', 'EG', 'cairo', 'rejected', 'rejected');
+end $$;
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare
+  it public.items;
+begin
+  -- ---------------------------------------------------------------------------
+  -- المحاولة المباشرة: اعتمد نفسك
+  -- ---------------------------------------------------------------------------
+  update public.items
+     set moderation = 'approved', status = 'available'
+   where id = 'aaaaaaaa-0000-0000-0000-0000000000e1';
+
+  select * into it from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-0000000000e1';
+
+  perform public.assert_eq(it.moderation::text, 'rejected',
+    'المستخدم مايقدرش يعتمد منتجه بنفسه');
+  perform public.assert_true(it.status::text <> 'available',
+    'والمنتج المرفوض مابيبقاش متاح');
+
+  -- ---------------------------------------------------------------------------
+  -- المحاولة غير المباشرة: عدّل عنوان منتج معتمد بعد ما عدّى
+  -- ---------------------------------------------------------------------------
+  update public.items
+     set title = 'مسدس بحالة ممتازة'
+   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+  select * into it from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+  perform public.assert_eq(it.moderation::text, 'pending',
+    'التعديل الجوهري رجّع المنتج للفحص');
+  perform public.assert_eq(it.status::text, 'pending',
+    'واتشال من السوق لحد ما يتفحص تاني');
+  perform public.assert_true(it.published_at is null,
+    'وتاريخ النشر اتلغى');
+
+  -- ---------------------------------------------------------------------------
+  -- نداء دالة الاعتماد مباشرة — الباب التالت
+  -- ---------------------------------------------------------------------------
+  declare
+    blocked boolean := false;
+  begin
+    begin
+      perform public.apply_moderation('aaaaaaaa-0000-0000-0000-000000000001',
+                                      'approved');
+    exception when insufficient_privilege then
+      blocked := true;
+    end;
+    perform public.assert_true(blocked,
+      'دالة الاعتماد نفسها مش متاحة للمستخدم');
+  end;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- التعديل المشروع مايتعاقبش
+-- ---------------------------------------------------------------------------
+reset role;
+reset request.jwt.claim.sub;
+
+do $$
+begin
+  perform public.apply_moderation('aaaaaaaa-0000-0000-0000-000000000001',
+                                  'approved');
+end $$;
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare
+  it public.items;
+begin
+  update public.items set will_pay_up_to = 500
+   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+  select * into it from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+  perform public.assert_eq(it.moderation::text, 'approved',
+    'تعديل السعر مش جوهري — الاعتماد فضل');
+  perform public.assert_eq(it.status::text, 'available',
+    'والمنتج فضل في السوق');
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- والإدخال كمان
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  it public.items;
+begin
+  insert into public.items
+    (id, owner_id, title, category_id, currency_code, country_code, city_id,
+     status, moderation)
+  values
+    ('aaaaaaaa-0000-0000-0000-0000000000ff',
+     '11111111-1111-1111-1111-111111111111',
+     'منتج بيحاول ينشر نفسه', 'mobiles', 'EGP', 'EG', 'cairo',
+     'available', 'approved');
+
+  select * into it from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-0000000000ff';
+
+  perform public.assert_eq(it.moderation::text, 'pending',
+    'المنتج الجديد بيبدأ في انتظار الفحص مهما اتبعت');
+  perform public.assert_eq(it.status::text, 'pending',
+    'ومابيبدأش متاح');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+-- ---------------------------------------------------------------------------
+-- والخادم لسه بيقدر يعتمد — الحارس بيفرّق بين الاتنين
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  it public.items;
+begin
+  perform public.apply_moderation('aaaaaaaa-0000-0000-0000-0000000000ff',
+                                  'approved');
+
+  select * into it from public.items
+   where id = 'aaaaaaaa-0000-0000-0000-0000000000ff';
+
+  perform public.assert_eq(it.status::text, 'available',
+    'الخادم لسه بيقدر ينشر');
+  perform public.assert_true(it.published_at is not null,
+    'وتاريخ النشر اتسجّل');
+end $$;
+
+
 do $$ begin raise notice E'\n✔ كل الاختبارات نجحت\n'; end $$;

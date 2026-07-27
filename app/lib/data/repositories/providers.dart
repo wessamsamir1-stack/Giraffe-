@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_state.dart';
 import '../models/models.dart';
+import 'ai_repository.dart';
 import 'auth_repository.dart';
 import 'deck_repository.dart';
 import 'items_repository.dart';
@@ -27,6 +28,7 @@ final matchesRepositoryProvider = Provider((ref) => const MatchesRepository());
 final storageRepositoryProvider = Provider((ref) => const StorageRepository());
 final notificationsRepositoryProvider =
     Provider((ref) => const NotificationsRepository());
+final aiRepositoryProvider = Provider((ref) => const AiRepository());
 
 // =============================================================================
 // البيانات

@@ -21,6 +21,9 @@ dependencies:
   # Backend
   supabase_flutter: ^2.5.6
 
+  # اختيار الصور من الكاميرا والمعرض
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
