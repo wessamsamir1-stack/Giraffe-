@@ -45,13 +45,13 @@ class Currency {
 
   String format(num value, {required bool ar}) {
     final text = value.toStringAsFixed(decimals);
-    return ar ? '$text ${symbolAr}' : '$text $symbolEn';
+    return ar ? '$text $symbolAr' : '$text $symbolEn';
   }
 
   /// تنسيق مختصر بدون كسور — للاستخدام في الكروت الضيقة.
   String formatCompact(num value, {required bool ar}) {
     final rounded = value.round();
-    return ar ? '$rounded ${symbolAr}' : '$rounded $symbolEn';
+    return ar ? '$rounded $symbolAr' : '$rounded $symbolEn';
   }
 }
 

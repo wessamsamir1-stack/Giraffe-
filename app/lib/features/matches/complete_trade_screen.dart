@@ -194,7 +194,7 @@ class _CompleteTradeScreenState extends ConsumerState<CompleteTradeScreen> {
                 FilteringTextInputFormatter.allow(RegExp('[0-9A-Za-z]')),
                 _UpperCaseFormatter(),
               ],
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: '••••••••',
                 counterText: '',
                 border: OutlineInputBorder(borderRadius: GRadius.brLg),

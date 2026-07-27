@@ -19,7 +19,7 @@ dependencies:
   go_router: ^14.2.7
 
   # Backend
-  supabase_flutter: ^2.5.6
+  supabase_flutter: ^2.15.4
 
   # اختيار الصور من الكاميرا والمعرض
   image_picker: ^1.1.2

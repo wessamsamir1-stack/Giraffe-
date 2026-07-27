@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -231,7 +229,7 @@ class _AddItemFlowScreenState extends ConsumerState<AddItemFlowScreen> {
       ModerationDecision.rejected => context.tr('safety.banned'),
       // معلّم أو غير معروف = مراجعة بشرية، والمنتج لسه مش ظاهر
       _ => context.tr('report.sent'),
-    });
+    },);
 
     if (mounted) context.pop();
   }

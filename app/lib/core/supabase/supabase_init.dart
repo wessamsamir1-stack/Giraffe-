@@ -25,7 +25,9 @@ class SupabaseInit {
     try {
       await Supabase.initialize(
         url: Env.supabaseUrl,
-        anonKey: Env.supabaseAnonKey,
+        // سوبابيز سمّاه publishableKey — نفس المفتاح، والاسم الجديد أوضح:
+        // ده مفتاح **معدّ للنشر**، مش سر. الحماية من RLS مش من إخفاؤه.
+        publishableKey: Env.supabaseAnonKey,
         authOptions: const FlutterAuthClientOptions(
           authFlowType: AuthFlowType.pkce,
         ),

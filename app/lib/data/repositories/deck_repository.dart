@@ -101,7 +101,7 @@ class DeckRepository {
         theirItem: theirItem,
         theirOwner: owner,
         myItem: myItem,
-      ));
+      ),);
     }
     return result;
   }
@@ -124,7 +124,7 @@ class DeckRepository {
         'p_target_item': targetItemId,
         'p_offered_item': offeredItemId,
         'p_intent': intent.name,
-      }) as Map<String, dynamic>;
+      },) as Map<String, dynamic>;
 
       return SwipeResult(
         ok: response['ok'] == true,

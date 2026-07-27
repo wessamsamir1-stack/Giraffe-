@@ -75,7 +75,7 @@ class ItemsRepository {
     int offset = 0,
   }) async {
     if (!hasBackend) {
-      final all = Mock.marketItems;
+      const all = Mock.marketItems;
       if (categoryId == null) return all;
       return all.where((i) => i.categoryId == categoryId).toList();
     }
@@ -133,14 +133,18 @@ class ItemsRepository {
         .select(_columns)
         .eq('status', 'available')
         .eq('moderation', 'approved')
-        .ilike('title_norm', '%${_normalize(term)}%')
+        .ilike('title_norm', '%${normalizeAr(term)}%')
         .limit(40);
 
     return rows.map(Item.fromMap).toList();
   }
 
   /// نفس منطق `public.normalize_ar` في القاعدة — لازم يفضلوا متطابقين.
-  static String _normalize(String input) {
+  ///
+  /// عامة عن قصد: الدالة دي مكتوبة تلات مرات — هنا وفي القاعدة وفي
+  /// دوال الحافة — وأي اختلاف بينهم بيخلي البحث يرجّع نتايج غلط في صمت.
+  /// فلازم تكون قابلة للاختبار.
+  static String normalizeAr(String input) {
     var out = input.toLowerCase().trim();
     const map = {
       'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ٱ': 'ا',

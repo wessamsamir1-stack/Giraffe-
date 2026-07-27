@@ -14,7 +14,6 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.colors;
     final ar = context.s.isArabic;
     final locale = ref.watch(localeProvider);
     final themeMode = ref.watch(themeModeProvider);
@@ -45,7 +44,7 @@ class SettingsScreen extends ConsumerWidget {
                   ThemeMode.light => 'settings.themeLight',
                   ThemeMode.dark => 'settings.themeDark',
                   ThemeMode.system => 'settings.themeSystem',
-                }),
+                },),
                 onTap: () => _pickTheme(context, ref),
               ),
               GSettingsTile(
@@ -160,12 +159,12 @@ class SettingsScreen extends ConsumerWidget {
                   ThemeMode.light => Icons.light_mode_outlined,
                   ThemeMode.dark => Icons.dark_mode_outlined,
                   ThemeMode.system => Icons.brightness_auto_outlined,
-                }),
+                },),
                 title: Text(context.tr(switch (mode) {
                   ThemeMode.light => 'settings.themeLight',
                   ThemeMode.dark => 'settings.themeDark',
                   ThemeMode.system => 'settings.themeSystem',
-                })),
+                },),),
                 trailing: mode == current
                     ? Icon(Icons.check_rounded, color: c.brand)
                     : null,

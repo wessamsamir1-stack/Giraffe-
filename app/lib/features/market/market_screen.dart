@@ -47,7 +47,8 @@ class MarketScreen extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 104,
+                // الارتفاع بيتحسب من إعدادات خط المستخدم مش رقم ثابت
+                height: CategoryTile.stripHeight(context),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(

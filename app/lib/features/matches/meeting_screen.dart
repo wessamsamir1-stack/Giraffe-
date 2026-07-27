@@ -246,7 +246,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
               child: Row(
                 children: [
                   Icon(Icons.check_circle_outline_rounded,
-                      size: 15, color: c.success),
+                      size: 15, color: c.success,),
                   const SizedBox(width: GSpace.sm),
                   Expanded(
                     child: Text(

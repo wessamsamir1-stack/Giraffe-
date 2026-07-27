@@ -127,7 +127,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                     ),
                     if (_reason == i)
                       Icon(Icons.check_circle_rounded,
-                          size: 20, color: c.brand),
+                          size: 20, color: c.brand,),
                   ],
                 ),
               ),

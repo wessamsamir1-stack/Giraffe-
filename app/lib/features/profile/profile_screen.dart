@@ -190,7 +190,7 @@ class ProfileScreen extends ConsumerWidget {
                                 TrustLevel.verified => 'trust.reqVerified',
                                 TrustLevel.trusted => 'trust.reqTrusted',
                                 _ => 'trust.reqElite',
-                              }),
+                              },),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),

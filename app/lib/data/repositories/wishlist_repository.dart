@@ -97,7 +97,7 @@ class WishlistRepository {
 
     final result = await _client.rpc('is_setup_complete', params: {
       'p_user': id,
-    });
+    },);
     return result == true;
   }
 }

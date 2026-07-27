@@ -29,7 +29,13 @@ class PriceRange extends StatelessWidget {
     final ar = context.s.isArabic;
     final currency = item.country.currency;
 
-    if (!item.hasReliableEstimate) {
+    // بناخدهم في متغيرات محلية عشان دارت مابيرقّيش الحقول القابلة للفراغ —
+    // بيرقّي المتغيرات المحلية بس. hasReliableEstimate بيتحقق منهم فعلاً،
+    // بس المصرّف مش شايف الربط ده.
+    final min = item.valueMin;
+    final max = item.valueMax;
+
+    if (!item.hasReliableEstimate || min == null || max == null) {
       return Text(
         context.tr('price.lowConfidence'),
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -40,8 +46,8 @@ class PriceRange extends StatelessWidget {
     }
 
     final range = compact
-        ? '${currency.formatCompact(item.valueMin, ar: ar)} – ${currency.formatCompact(item.valueMax, ar: ar)}'
-        : '${currency.formatCompact(item.valueMin, ar: ar)} – ${currency.format(item.valueMax, ar: ar)}';
+        ? '${currency.formatCompact(min, ar: ar)} – ${currency.formatCompact(max, ar: ar)}'
+        : '${currency.formatCompact(min, ar: ar)} – ${currency.format(max, ar: ar)}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,11 +132,19 @@ class ItemCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 1.08,
-                child: ClipRRect(
+          // الصورة بتاخد اللي فاضل بعد النص، مش مقاس ثابت.
+          //
+          // قبل كده كانت AspectRatio ثابتة جوه شبكة بـ childAspectRatio
+          // ثابت — يعني ارتفاع الكارت مقفول والنص جواه متغير. وده بيطفح
+          // أول ما النص يكبر: التطبيق بيسمح بتكبير الخط لحد 1.35 لأسباب
+          // إتاحة، فالطفح كان مضمون لأي حد مكبّر الخط.
+          //
+          // دلوقتي النص بياخد حقه والصورة بتستوعب الباقي.
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(GRadius.lg),
                   ),
@@ -140,7 +154,6 @@ class ItemCard extends StatelessWidget {
                     radius: BorderRadius.zero,
                   ),
                 ),
-              ),
               if (showStatus)
                 PositionedDirectional(
                   top: GSpace.sm,
@@ -159,7 +172,8 @@ class ItemCard extends StatelessWidget {
                     dense: true,
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(GSpace.md),
@@ -234,7 +248,6 @@ class ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ar = context.s.isArabic;
     final category = Categories.byId(item.categoryId);
 
     return GSurface(
@@ -290,6 +303,23 @@ class CategoryTile extends StatelessWidget {
   final Category category;
   final VoidCallback? onTap;
   final int? count;
+
+  /// أبعاد ثابتة داخل المربع — الأيقونة والمسافات مابيكبروش مع الخط.
+  static const double _iconBox = 46;
+  static const double _labelLines = 2;
+
+  /// الارتفاع اللازم للمربع عند إعدادات الخط الحالية.
+  ///
+  /// الشريط الأفقي محتاج ارتفاع صريح، وكان مكتوب `104` رقم ثابت.
+  /// المشكلة إن التطبيق بيسمح بتكبير الخط لحد 1.35 لأسباب إتاحة —
+  /// فالرقم الثابت كان بيطفح لأي مستخدم مكبّر الخط.
+  ///
+  /// دلوقتي الارتفاع بيتحسب: الجزء الثابت + النص بعد التكبير.
+  static double stripHeight(BuildContext context) {
+    final fontSize = Theme.of(context).textTheme.labelMedium?.fontSize ?? 12;
+    final lineHeight = MediaQuery.textScalerOf(context).scale(fontSize) * 1.35;
+    return GSpace.lg * 2 + _iconBox + GSpace.sm + lineHeight * _labelLines + 2;
+  }
 
   @override
   Widget build(BuildContext context) {
