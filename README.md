@@ -81,7 +81,7 @@ flutter run
 | [`docs/03-roadmap.md`](docs/03-roadmap.md) | خطة التنفيذ على ٣ مراحل |
 | [`docs/04-product-decisions.md`](docs/04-product-decisions.md) | القرارات المنتجية وأسبابها |
 | [`docs/05-auth-security.md`](docs/05-auth-security.md) | تأمين التسجيل والدخول |
-| [`docs/06-categories-and-markets.md`](docs/06-categories-and-markets.md) | الأقسام الـ 22 والأسواق السبعة |
+| [`docs/06-categories-and-markets.md`](docs/06-categories-and-markets.md) | الأقسام الـ 21 والأسواق السبعة |
 | [`docs/07-design-system.md`](docs/07-design-system.md) | نظام التصميم والمكوّنات |
 
 ---

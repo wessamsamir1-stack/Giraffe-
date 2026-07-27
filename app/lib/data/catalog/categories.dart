@@ -72,7 +72,6 @@ class Categories {
     cameras,
     gaming,
     vehicles,
-    realEstate,
     furniture,
     appliances,
     fashion,
@@ -181,21 +180,11 @@ class Categories {
     ],
   );
 
-  static const realEstate = Category(
-    id: 'realestate',
-    nameAr: 'عقارات',
-    nameEn: 'Real Estate',
-    icon: Icons.apartment_rounded,
-    restricted: true,
-    subs: [
-      SubCategory(id: 'apartments', nameAr: 'شقق', nameEn: 'Apartments'),
-      SubCategory(id: 'villas', nameAr: 'فيلات وبيوت', nameEn: 'Villas & houses'),
-      SubCategory(id: 'land', nameAr: 'أراضي', nameEn: 'Land'),
-      SubCategory(id: 'shops', nameAr: 'محلات', nameEn: 'Shops'),
-      SubCategory(id: 'offices', nameAr: 'مكاتب', nameEn: 'Offices'),
-      SubCategory(id: 'chalets', nameAr: 'شاليهات', nameEn: 'Chalets'),
-    ],
-  );
+  // العقارات مستبعدة عمداً من التطبيق.
+  //
+  // مقايضة العقارات ممارسة حقيقية في المنطقة، لكنها بتحتاج توثيق ملكية
+  // ووسيط قانوني وعقود مسجلة — وده خارج نطاق Giraffe تماماً، وكان
+  // هيحمّلنا مسؤولية قانونية في سبع دول بقوانين مختلفة.
 
   // ---------------------------------------------------------------- المنزل
   static const furniture = Category(
