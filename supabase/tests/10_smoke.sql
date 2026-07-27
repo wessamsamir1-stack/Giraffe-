@@ -1570,4 +1570,201 @@ begin
 end $$;
 
 
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 21. التفاصيل المكمّلة'; end $$;
+-- =============================================================================
+
+-- صور لمنتج معلّم
+insert into public.items
+  (id, owner_id, title, category_id, condition, status, moderation,
+   moderation_note, currency_code, country_code, city_id)
+values
+  ('dddddddd-0000-0000-0000-000000000001',
+   '11111111-1111-1111-1111-111111111111',
+   'منتج بصور محتاج مراجعة', 'mobiles', 'good', 'pending', 'flagged',
+   'الصور مش واضحة', 'EGP', 'EG', 'cairo');
+
+insert into public.item_photos (item_id, storage_path, position) values
+  ('dddddddd-0000-0000-0000-000000000001', 'u1/a.jpg', 0),
+  ('dddddddd-0000-0000-0000-000000000001', 'u1/b.jpg', 1),
+  ('dddddddd-0000-0000-0000-000000000001', 'u1/c.jpg', 2);
+
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare
+  row_ record;
+begin
+  select * into row_ from public.moderation_queue_page('content', 50)
+   where item_id = 'dddddddd-0000-0000-0000-000000000001';
+
+  -- المراجع كان بيشوف «3 صور» بس. يعني بنطلب منه يحكم على محتوى
+  -- بصري من غير ما يشوفه.
+  perform public.assert_eq(jsonb_array_length(row_.photos), 3,
+    'الصور بترجع مع الحالة');
+  perform public.assert_eq(row_.photos->>0, 'u1/a.jpg',
+    'وبالترتيب الصح');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+-- -----------------------------------------------------------------------------
+-- لغة الإشعار — خاصية الجهاز مش المستخدم
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+begin
+  perform public.register_push_token('tok-ar', 'android', 'ar');
+  perform public.register_push_token('tok-en', 'ios', 'en-US');
+  -- لغة مش مدعومة بترجع للعربي
+  perform public.register_push_token('tok-fr', 'android', 'fr-FR');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+do $$
+declare
+  n int;
+begin
+  select count(*)::int into n from public.push_tokens
+   where token = 'tok-en' and lang = 'en';
+  perform public.assert_eq(n, 1, 'الجهاز الإنجليزي اتسجّل بالإنجليزي');
+
+  select count(*)::int into n from public.push_tokens
+   where token = 'tok-ar' and lang = 'ar';
+  perform public.assert_eq(n, 1, 'والعربي بالعربي');
+
+  select count(*)::int into n from public.push_tokens
+   where token = 'tok-fr' and lang = 'ar';
+  perform public.assert_eq(n, 1, 'واللغة غير المدعومة بترجع للعربي');
+end $$;
+
+-- واللغة بتوصل للعامل مع كل جهاز
+do $$
+declare
+  b       record;
+  langs   text[];
+begin
+  perform public.notify_user(
+    '11111111-1111-1111-1111-111111111111', 'match',
+    'مطابقة', 'A match',
+    jsonb_build_object('match_id', '00000000-0000-0000-0000-0000000000dd'));
+
+  update public.push_outbox set not_before = now() - interval '1 minute';
+
+  select * into b from public.push_claim_batch(10)
+   where user_id = '11111111-1111-1111-1111-111111111111' limit 1;
+
+  select array_agg(distinct t->>'lang')
+    into langs
+    from jsonb_array_elements(b.tokens) t;
+
+  perform public.assert_true('en' = any(langs),
+    'العامل بيوصله جهاز إنجليزي');
+  perform public.assert_true('ar' = any(langs),
+    'وجهاز عربي — والنص بيتاخد لكل واحد على حدة');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- تنبيه تأخّر الطابور
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  n int;
+begin
+  -- الطابور لسه جديد → مفيش تنبيه
+  select public.moderation_sla_check(24) into n;
+  perform public.assert_eq(n, 0, 'الطابور الجديد مالوش تنبيه');
+
+  -- نخلي الحالة قديمة. بنعدّل عمود الطابور مباشرةً — العمود ده
+  -- مابيتغيرش إلا عند الدخول للطابور، عشان كده هو الصح للحساب.
+  update public.items
+     set moderation_queued_at = now() - interval '30 hours'
+   where id = 'dddddddd-0000-0000-0000-000000000001';
+
+  select public.moderation_sla_check(24) into n;
+  perform public.assert_true(n > 0,
+    'التأخّر بيتبلّغ للطاقم (' || n || ')');
+
+  perform public.assert_true(
+    exists (select 1 from public.notifications
+             where payload->>'alert' = 'moderation_sla'
+               and user_id = '33333333-3333-3333-3333-333333333333'),
+    'ومنى المراجعة اتبلّغت');
+
+  -- ---------------------------------------------------------------------------
+  -- ومابيتكررش
+  --
+  -- من غير الشرط ده، التنبيه بيرن كل ساعة على نفس الحالة — والمراجع
+  -- بيتعلّم يتجاهله، وساعتها بيبقى أسوأ من مفيش تنبيه.
+  -- ---------------------------------------------------------------------------
+  select public.moderation_sla_check(24) into n;
+  perform public.assert_eq(n, 0, 'والتنبيه مابيتكررش خلال 6 ساعات');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- تعديل صاحب المنتج مايرجّعوش لآخر الطابور
+--
+-- ده كان عطل حقيقي: الطابور كان بيحسب الانتظار من updated_at، والمحفّز
+-- items_touch بيحدّثه مع أي تعديل. يعني صاحب المنتج المعلّم يعدّل سعره
+-- فيبان كأنه لسه داخل الطابور — وتنبيه التأخّر مايرنّش عليه أبداً.
+--
+-- والنتيجة إن أقدم الحالات هي اللي بتضيع، وهي بالظبط اللي محتاجة
+-- الاهتمام.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  before_min int;
+  after_min  int;
+begin
+  select waiting_minutes::int into before_min
+    from public.moderation_queue
+   where item_id = 'dddddddd-0000-0000-0000-000000000001';
+
+  perform public.assert_true(before_min >= 60 * 29,
+    'الحالة مستنية من 30 ساعة (' || before_min || ' دقيقة)');
+
+  -- صاحب المنتج بيعدّل حاجة غير جوهرية
+  update public.items set will_pay_up_to = 250
+   where id = 'dddddddd-0000-0000-0000-000000000001';
+
+  select waiting_minutes::int into after_min
+    from public.moderation_queue
+   where item_id = 'dddddddd-0000-0000-0000-000000000001';
+
+  perform public.assert_true(after_min >= 60 * 29,
+    'والتعديل مارجّعهاش لآخر الطابور (' || after_min || ' دقيقة)');
+
+  -- وupdated_at اتحدّث فعلاً — يعني الاختبار بيقيس الحاجة الصح
+  perform public.assert_true(
+    (select updated_at from public.items
+      where id = 'dddddddd-0000-0000-0000-000000000001') > now() - interval '1 minute',
+    'مع إن updated_at اتحدّث بالفعل');
+end $$;
+
+-- والتنبيه ده شغل خادم — مش للعميل
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare
+  blocked boolean := false;
+begin
+  begin
+    perform public.moderation_sla_check(24);
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'حتى المراجع مايناديش فحص التأخّر');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+
 do $$ begin raise notice E'\n✔ كل الاختبارات نجحت\n'; end $$;

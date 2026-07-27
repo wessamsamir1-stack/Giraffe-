@@ -504,4 +504,7 @@ const Map<String, String> kEn = {
   'scan.err.needsUpdate': 'This code needs a newer version of the app',
   'scan.err.camera': 'Cannot open the camera. Permission may be denied.',
   'complete.confirm': 'Confirm trade',
+
+  // Review photos
+  'mod.photosUnavailable': 'Photos unavailable — judge with caution or defer',
 };

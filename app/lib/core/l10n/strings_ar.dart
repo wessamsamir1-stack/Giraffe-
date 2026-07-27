@@ -505,4 +505,7 @@ const Map<String, String> kAr = {
   'scan.err.needsUpdate': 'الكود ده محتاج نسخة أحدث من التطبيق',
   'scan.err.camera': 'مش قادرين نفتح الكاميرا. ممكن الصلاحية مرفوضة.',
   'complete.confirm': 'أكّد الإتمام',
+
+  // صور المراجعة
+  'mod.photosUnavailable': 'الصور مش متاحة دلوقتي — احكم بحذر أو أجّل الحالة',
 };

@@ -110,6 +110,39 @@ class _ModerationReviewScreenState
     );
   }
 
+  /// فتح الصورة بالحجم الكامل.
+  ///
+  /// التفاصيل الصغيرة هي اللي بيتحكم عليها غالباً — علامة مقلّدة،
+  /// رقم موبايل في ركن الصورة، خدش. المصغّرة مش كفاية.
+  void _openPhoto(String path) {
+    final url = ref.read(storageRepositoryProvider).itemPhotoUrl(path);
+    if (url == null) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(GSpace.md),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              maxScale: 5,
+              child: Center(child: Image.network(url)),
+            ),
+            PositionedDirectional(
+              top: 0,
+              end: 0,
+              child: IconButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -203,6 +236,35 @@ class _ModerationReviewScreenState
             ),
           ),
 
+          // -------------------------------------------------------------------
+          // الصور
+          //
+          // كنا بنعرض العدد بس — يعني بنطلب من المراجع يحكم على محتوى
+          // بصري من غير ما يشوفه. ودي أكتر حاجة المنتجات بتتعلّم بسببها.
+          // -------------------------------------------------------------------
+          if (it.photos.isNotEmpty) ...[
+            const SizedBox(height: GSpace.md),
+            SizedBox(
+              height: 190,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: it.photos.length,
+                separatorBuilder: (_, __) => const SizedBox(width: GSpace.sm),
+                itemBuilder: (context, i) => _ReviewPhoto(
+                  path: it.photos[i],
+                  onTap: () => _openPhoto(it.photos[i]),
+                ),
+              ),
+            ),
+          ] else if (it.photoCount > 0) ...[
+            const SizedBox(height: GSpace.md),
+            GNotice(
+              tone: GNoticeTone.info,
+              icon: Icons.image_not_supported_outlined,
+              text: context.tr('mod.photosUnavailable'),
+            ),
+          ],
+
           const SizedBox(height: GSpace.md),
 
           // -------------------------------------------------------------------
@@ -295,6 +357,53 @@ class _ModerationReviewScreenState
             text: context.tr('mod.logged'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// صورة مصغّرة في شاشة المراجعة.
+class _ReviewPhoto extends ConsumerWidget {
+  const _ReviewPhoto({required this.path, required this.onTap});
+
+  final String path;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final url = ref.watch(storageRepositoryProvider).itemPhotoUrl(path);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: GRadius.brLg,
+        child: SizedBox(
+          width: 150,
+          height: 190,
+          child: url == null
+              // من غير خادم مفيش رابط — بنعرض بديل بدل ما نسيب فراغ
+              ? GImagePlaceholder(seed: path.hashCode, icon: Icons.image_outlined)
+              : Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  // الصورة اللي مش بتحمّل مش تفصيلة هنا: المراجع لازم
+                  // يعرف إنه بيحكم على حاجة ناقصة.
+                  errorBuilder: (_, __, ___) => Container(
+                    color: c.surfaceAlt,
+                    child: Icon(Icons.broken_image_outlined,
+                        color: c.textTertiary,),
+                  ),
+                  loadingBuilder: (_, child, progress) => progress == null
+                      ? child
+                      : Container(
+                          color: c.surfaceAlt,
+                          child: const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                ),
+        ),
       ),
     );
   }

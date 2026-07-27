@@ -36,6 +36,7 @@ class QueueEntry {
     required this.flagNote,
     required this.waitingMinutes,
     required this.openReports,
+    this.photos = const [],
   });
 
   final String itemId;
@@ -56,6 +57,12 @@ class QueueEntry {
   final int waitingMinutes;
   final int openReports;
 
+  /// مسارات الصور في التخزين، بترتيبها.
+  ///
+  /// من غيرها المراجعة مستحيلة على منتج اتعلّم بسبب صوره أصلاً —
+  /// كنا بنعرض العدد بس ونطلب حكم على محتوى بصري مش ظاهر.
+  final List<String> photos;
+
   bool get isUrgent => openReports > 0 || waitingMinutes > 60 * 24;
 
   factory QueueEntry.fromMap(Map<String, dynamic> row) => QueueEntry(
@@ -73,6 +80,9 @@ class QueueEntry {
         flagNote: row['moderation_note'] as String?,
         waitingMinutes: (row['waiting_minutes'] as num?)?.toInt() ?? 0,
         openReports: (row['open_reports'] as num?)?.toInt() ?? 0,
+        photos: ((row['photos'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
       );
 }
 
@@ -255,6 +265,7 @@ class ModerationRepository {
         flagNote: 'ادعاء أصالة غير مؤكد — الصور مش واضحة',
         waitingMinutes: 190,
         openReports: 2,
+        photos: ['demo/watch-1.jpg', 'demo/watch-2.jpg'],
       ),
       QueueEntry(
         itemId: 'mock-2',

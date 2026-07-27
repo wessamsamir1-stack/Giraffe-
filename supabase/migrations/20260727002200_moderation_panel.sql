@@ -207,7 +207,9 @@ begin
                               'current', it.moderation::text);
   end if;
 
-  waited := floor(extract(epoch from (now() - it.updated_at)) / 60);
+  -- من وقت دخول الطابور مش من آخر تعديل — شوف ملف 24
+  waited := floor(extract(epoch from
+    (now() - coalesce(it.moderation_queued_at, it.updated_at))) / 60);
 
   insert into public.moderation_decisions
     (item_id, moderator_id, decision, reason, ai_decision, ai_note, waited_minutes)

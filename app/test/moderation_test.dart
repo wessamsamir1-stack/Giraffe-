@@ -95,6 +95,32 @@ void main() {
     });
   });
 
+  group('الصور', () {
+    // المراجع كان بيشوف «3 صور» بس — يعني بنطلب منه يحكم على محتوى
+    // بصري من غير ما يشوفه، وده أكتر سبب المنتجات بتتعلّم عشانه.
+
+    test('المسارات بتتقرا من القاعدة بترتيبها', () {
+      final entry = QueueEntry.fromMap({
+        'item_id': 'x',
+        'title': 'منتج',
+        'category_id': 'mobiles',
+        'photos': ['u1/a.jpg', 'u1/b.jpg', 'u1/c.jpg'],
+      });
+
+      expect(entry.photos, ['u1/a.jpg', 'u1/b.jpg', 'u1/c.jpg']);
+    });
+
+    test('منتج من غير صور بيرجع قايمة فاضية مش null', () {
+      final entry = QueueEntry.fromMap({
+        'item_id': 'x',
+        'title': 'منتج',
+        'category_id': 'mobiles',
+      });
+
+      expect(entry.photos, isEmpty);
+    });
+  });
+
   group('تصنيف سبب التعليم', () {
     // نفس منطق public.flag_kind في القاعدة.
     test('الملاحظات دي مالهاش لازمة بشرية', () {

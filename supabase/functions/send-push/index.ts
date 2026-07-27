@@ -26,6 +26,9 @@ import { json, preflight, serviceClient } from '../_shared/core.ts';
 interface TokenRef {
   token: string;
   platform: 'ios' | 'android' | 'web';
+  /// لغة الجهاز — خاصية الجهاز مش المستخدم: ممكن يكون عنده موبايل
+  /// بالعربي وتابلت بالإنجليزي.
+  lang: 'ar' | 'en';
 }
 
 interface Job {
@@ -184,19 +187,17 @@ Deno.serve(async (req) => {
     let lastError: string | null = null;
 
     for (const ref of job.tokens) {
-      // -----------------------------------------------------------------------
-      // النص بالعربي — ده سوق مصر والخليج، والعربي هو الافتراضي.
-      //
-      // التبديل حسب لغة الجهاز محتاج تخزين اللغة مع الرمز، وده
-      // مؤجّل. العربي أقل ضرر من الإنجليزي هنا.
-      // -----------------------------------------------------------------------
+      // النص بلغة **الجهاز**. الافتراضي عربي — ده سوق مصر والخليج.
+      const useEn = ref.lang === 'en';
+      const title = useEn ? (job.title_en || job.title_ar) : job.title_ar;
+      const body = useEn
+        ? (job.body_en ?? job.body_ar ?? undefined)
+        : (job.body_ar ?? undefined);
+
       const message = {
         message: {
           token: ref.token,
-          notification: {
-            title: job.title_ar,
-            body: job.body_ar ?? undefined,
-          },
+          notification: { title, body },
           data: Object.fromEntries(
             Object.entries({ ...job.payload, kind: job.kind })
               .map(([k, v]) => [k, String(v)]),

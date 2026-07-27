@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/push/push_service.dart';
@@ -50,12 +51,25 @@ class PushRepository {
     return _push.onTokenRefresh.listen(_save);
   }
 
+  /// لغة الجهاز.
+  ///
+  /// اللغة خاصية **الجهاز** مش المستخدم: ممكن يكون عنده موبايل بالعربي
+  /// وتابلت بالإنجليزي، والرنة لازم توصل بلغة الجهاز اللي هتظهر عليه.
+  String get _deviceLang {
+    final locales = WidgetsBinding.instance.platformDispatcher.locales;
+    if (locales.isEmpty) return 'ar';
+    return locales.first.languageCode.toLowerCase().startsWith('en')
+        ? 'en'
+        : 'ar';
+  }
+
   Future<void> _save(String token) async {
     if (!hasBackend) return;
     try {
       await _client.rpc('register_push_token', params: {
         'p_token': token,
         'p_platform': _platform,
+        'p_lang': _deviceLang,
       },);
     } catch (_) {
       // فشل التسجيل مش خطأ للمستخدم — بيتعاد أول ما التطبيق يفتح تاني
