@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
@@ -7,6 +8,7 @@ import '../../core/security/attempt_guard.dart';
 import '../../core/security/validators.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
@@ -16,14 +18,14 @@ import '../../widgets/g_text_field.dart';
 /// قاعدة أمنية مطبقة هنا: **ممنوع كشف وجود الحساب**.
 /// رسالة الخطأ واحدة سواء البريد غلط أو كلمة السر غلط
 /// (`auth.err.generic`)، عشان مانسمحش بتعداد الحسابات.
-class SignInScreen extends StatefulWidget {
+class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
   @override
-  State<SignInScreen> createState() => _SignInScreenState();
+  ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _SignInScreenState extends State<SignInScreen> {
+class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _guard = AttemptGuard();
@@ -64,12 +66,24 @@ class _SignInScreenState extends State<SignInScreen> {
       _loading = true;
       _formError = null;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+
+    final result = await ref.read(authRepositoryProvider).signIn(
+          email: _email.text,
+          password: _password.text,
+        );
+
     if (!mounted) return;
     setState(() => _loading = false);
 
+    if (!result.isOk) {
+      _guard.recordFailure();
+      // رسالة موحّدة دايماً — ممنوع نكشف إذا كان الحساب موجود
+      setState(() => _formError = 'auth.err.generic');
+      return;
+    }
+
     _guard.recordSuccess();
-    context.go(R.market);
+    if (mounted) context.go(R.splash);
   }
 
   @override

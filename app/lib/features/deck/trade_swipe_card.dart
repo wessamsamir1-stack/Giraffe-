@@ -99,7 +99,7 @@ class TradeSwipeCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        candidate.theirItem.title(ar),
+                        candidate.theirItem.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context)
@@ -153,7 +153,7 @@ class TradeSwipeCard extends StatelessWidget {
                     Expanded(
                       child: _Side(
                         labelKey: 'offer.get',
-                        title: candidate.theirItem.title(ar),
+                        title: candidate.theirItem.title,
                         icon: category.icon,
                         highlight: true,
                       ),
@@ -179,7 +179,7 @@ class TradeSwipeCard extends StatelessWidget {
                     Expanded(
                       child: _Side(
                         labelKey: 'offer.give',
-                        title: candidate.myItem.title(ar),
+                        title: candidate.myItem.title,
                         icon: Categories.byId(candidate.myItem.categoryId).icon,
                       ),
                     ),

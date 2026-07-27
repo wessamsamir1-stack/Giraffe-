@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
@@ -6,22 +7,22 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/item_card.dart';
 
-class ItemDetailScreen extends StatefulWidget {
+class ItemDetailScreen extends ConsumerStatefulWidget {
   const ItemDetailScreen({super.key, required this.itemId});
 
   final String itemId;
 
   @override
-  State<ItemDetailScreen> createState() => _ItemDetailScreenState();
+  ConsumerState<ItemDetailScreen> createState() => _ItemDetailScreenState();
 }
 
-class _ItemDetailScreenState extends State<ItemDetailScreen> {
+class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   final _gallery = PageController();
   int _page = 0;
 
@@ -35,10 +36,29 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ar = context.s.isArabic;
-    final item = Mock.item(widget.itemId);
-    final owner = Mock.user(item.ownerId);
+
+    final async = ref.watch(itemProvider(widget.itemId));
+    final item = async.valueOrNull;
+
+    if (item == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: async.hasError
+            ? GEmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: context.tr('common.error'),
+                body: context.tr('common.errorBody'),
+                actionLabel: context.tr('common.retry'),
+                onAction: () => ref.invalidate(itemProvider(widget.itemId)),
+              )
+            : const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final ownerAsync = ref.watch(ownerProvider(item.ownerId));
+    final owner = ownerAsync.valueOrNull;
     final category = Categories.byId(item.categoryId);
-    final isMine = item.ownerId == Mock.me.id;
+    final isMine = item.ownerId == ref.watch(myUserIdProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -96,7 +116,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        item.title(ar),
+                        item.title,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                     ),
@@ -127,14 +147,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 ),
 
                 const SizedBox(height: GSpace.xl),
-                if (item.description(ar).isNotEmpty) ...[
+                if (item.description.isNotEmpty) ...[
                   Text(
                     context.tr('item.description'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: GSpace.sm),
                   Text(
-                    item.description(ar),
+                    item.description,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: GSpace.xl),
@@ -189,6 +209,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                 const SizedBox(height: GSpace.xl),
                 // المالك
+                if (owner != null)
                 GSurface(
                   onTap: isMine
                       ? null

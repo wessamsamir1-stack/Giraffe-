@@ -119,6 +119,8 @@ const Map<String, String> kEn = {
   'auth.err.weakPassword': 'Password must meet all requirements',
   'auth.err.termsRequired': 'You must accept the terms',
   'auth.err.ageRequired': 'You must confirm you are 18 or older',
+  'auth.err.usernameTaken': 'That username is taken — try another',
+  'auth.err.offline': 'No connection. Running on sample data.',
 
   // ------------------------------------------------------------ Setup
   'setup.profile.title': 'Tell us about you',

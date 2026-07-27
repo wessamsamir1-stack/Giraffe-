@@ -10,6 +10,7 @@ import '../../core/security/password_policy.dart';
 import '../../core/security/validators.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
@@ -99,14 +100,30 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     }
 
     setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+
+    final result = await ref.read(authRepositoryProvider).signUp(
+          email: _email.text,
+          password: _password.text,
+          displayName: _name.text,
+        );
+
     if (!mounted) return;
     setState(() => _loading = false);
+
+    if (!result.isOk) {
+      _guard.recordFailure();
+      setState(() => _emailError = result.error);
+      return;
+    }
 
     _guard.recordSuccess();
     ref.read(authStageProvider.notifier).state = AuthStage.needsProfile;
 
-    context.push('${R.otp}?type=email&target=${Uri.encodeComponent(_email.text)}');
+    if (mounted) {
+      context.push(
+        '${R.otp}?type=email&target=${Uri.encodeComponent(_email.text)}',
+      );
+    }
   }
 
   @override

@@ -35,7 +35,6 @@ class _MatchCelebrationScreenState extends State<MatchCelebrationScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final ar = context.s.isArabic;
     final match = Mock.match(widget.matchId);
 
     return Scaffold(
@@ -92,7 +91,7 @@ class _MatchCelebrationScreenState extends State<MatchCelebrationScreen>
                 children: [
                   Expanded(
                     child: _MatchItem(
-                      title: match.myItem.title(ar),
+                      title: match.myItem.title,
                       icon: Categories.byId(match.myItem.categoryId).icon,
                       seed: match.myItem.imageSeed,
                     ),
@@ -115,7 +114,7 @@ class _MatchCelebrationScreenState extends State<MatchCelebrationScreen>
                   ),
                   Expanded(
                     child: _MatchItem(
-                      title: match.theirItem.title(ar),
+                      title: match.theirItem.title,
                       icon: Categories.byId(match.theirItem.categoryId).icon,
                       seed: match.theirItem.imageSeed,
                     ),

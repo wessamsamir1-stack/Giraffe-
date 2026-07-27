@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_state.dart';
@@ -7,6 +8,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
@@ -15,15 +17,39 @@ import '../../widgets/g_common.dart';
 /// من غير قائمة رغبات، محرك المطابقة ما بيشتغلش والـ deck بيبقى عشوائي.
 /// وعشان كده الشاشة دي **إجبارية بدون تخطي**، والزر مقفول لحد ما
 /// المستخدم يختار 3 أقسام على الأقل.
-class WishlistBuilderScreen extends StatefulWidget {
+class WishlistBuilderScreen extends ConsumerStatefulWidget {
   const WishlistBuilderScreen({super.key});
 
   @override
-  State<WishlistBuilderScreen> createState() => _WishlistBuilderScreenState();
+  ConsumerState<WishlistBuilderScreen> createState() =>
+      _WishlistBuilderScreenState();
 }
 
-class _WishlistBuilderScreenState extends State<WishlistBuilderScreen> {
+class _WishlistBuilderScreenState extends ConsumerState<WishlistBuilderScreen> {
   final Set<String> _selected = {};
+  bool _saving = false;
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+
+    final error = await ref
+        .read(wishlistRepositoryProvider)
+        .setCategories(_selected.toList());
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(myWishlistProvider);
+    ref.invalidate(deckProvider);
+    if (mounted) context.go(R.market);
+  }
 
   bool get _canContinue => _selected.length >= kMinWishlistItems;
 
@@ -150,7 +176,8 @@ class _WishlistBuilderScreenState extends State<WishlistBuilderScreen> {
               ),
               child: GButton(
                 label: context.tr('common.continue'),
-                onPressed: _canContinue ? () => context.go(R.market) : null,
+                loading: _saving,
+                onPressed: _canContinue ? _save : null,
               ),
             ),
           ],

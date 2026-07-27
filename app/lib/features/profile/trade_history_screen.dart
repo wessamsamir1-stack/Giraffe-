@@ -16,7 +16,6 @@ class TradeHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final ar = context.s.isArabic;
     final history = Mock.matches;
 
     return Scaffold(
@@ -94,7 +93,7 @@ class TradeHistoryScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '${match.myItem.title(ar)}  ↔  ${match.theirItem.title(ar)}',
+                        '${match.myItem.title}  ↔  ${match.theirItem.title}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,

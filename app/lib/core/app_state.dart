@@ -34,6 +34,40 @@ enum AuthStage {
 /// وأهمها **قائمة الرغبات**، لأن من غيرها محرك المطابقة ما بيشتغلش.
 final authStageProvider = StateProvider<AuthStage>((ref) => AuthStage.ready);
 
+// ------------------------------------------------------------------ مسودة الإعداد
+/// بيانات الإعداد الأولي قبل ما تتحفظ.
+///
+/// شاشة الملف بتملاها، وشاشة الموقع بتكمّلها وتحفظ الاتنين مرة واحدة —
+/// عشان مانعملش صف ملف ناقص لو المستخدم قفل التطبيق في النص.
+class SetupDraft {
+  const SetupDraft({
+    this.displayName = '',
+    this.username = '',
+    this.bio = '',
+    this.avatarPath,
+  });
+
+  final String displayName;
+  final String username;
+  final String bio;
+  final String? avatarPath;
+
+  SetupDraft copyWith({
+    String? displayName,
+    String? username,
+    String? bio,
+    String? avatarPath,
+  }) =>
+      SetupDraft(
+        displayName: displayName ?? this.displayName,
+        username: username ?? this.username,
+        bio: bio ?? this.bio,
+        avatarPath: avatarPath ?? this.avatarPath,
+      );
+}
+
+final setupDraftProvider = StateProvider<SetupDraft>((ref) => const SetupDraft());
+
 // ------------------------------------------------------------------ حدود يومية
 /// عدد السحبات المتبقية النهارده للمستخدم العادي.
 final swipesLeftProvider = StateProvider<int>((ref) => 50);

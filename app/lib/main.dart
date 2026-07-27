@@ -3,14 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/supabase/supabase_init.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+
+  // لو الاتصال فشل أو مفيش إعدادات، التطبيق بيكمل على البيانات التجريبية
+  // بدل ما يقف على شاشة بيضا.
+  await SupabaseInit.ensureInitialized();
 
   runApp(const ProviderScope(child: GiraffeApp()));
 }

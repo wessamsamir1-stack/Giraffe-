@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/security/validators.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
@@ -13,14 +15,15 @@ import '../../widgets/g_text_field.dart';
 ///
 /// قاعدة أمنية: الرسالة بعد الإرسال **واحدة دايماً** سواء البريد
 /// مسجّل عندنا أو لأ — عشان مانسمحش بتعداد الحسابات.
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _email = TextEditingController();
   String? _error;
   bool _sent = false;
@@ -38,8 +41,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (error != null) return;
 
     setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    await ref.read(authRepositoryProvider).requestPasswordReset(_email.text);
     if (!mounted) return;
+    // النتيجة واحدة دايماً سواء البريد مسجّل أو لأ — منع تعداد الحسابات
     setState(() {
       _loading = false;
       _sent = true;

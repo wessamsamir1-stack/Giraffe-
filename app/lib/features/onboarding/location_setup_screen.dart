@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/countries.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
@@ -18,11 +21,70 @@ import '../../widgets/g_common.dart';
 ///
 /// قرار سيولة: كل مدينة سوق منفصل. مفيش عرض عابر للحدود في المرحلة الأولى
 /// لأن فرق القوة الشرائية بين مصر والخليج بيكسر التقييم.
-class LocationSetupScreen extends ConsumerWidget {
+class LocationSetupScreen extends ConsumerStatefulWidget {
   const LocationSetupScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LocationSetupScreen> createState() =>
+      _LocationSetupScreenState();
+}
+
+class _LocationSetupScreenState extends ConsumerState<LocationSetupScreen> {
+  bool _saving = false;
+
+  /// تزحزح الإحداثيات قبل الحفظ.
+  ///
+  /// إحنا **مش بناخد الموقع الحقيقي**. بناخد مركز المدينة ونزحزحه
+  /// عشوائياً في حدود كيلومتر، وده كفاية تماماً لترتيب الصفقات بالمسافة
+  /// ومش كفاية أبداً لاستنتاج عنوان حد.
+  (double, double) _jitter(double lat, double lng) {
+    final seed = DateTime.now().microsecondsSinceEpoch;
+    final angle = (seed % 360) * 3.14159 / 180;
+    final dist = ((seed >> 8) % 100) / 100.0;
+    final dLat = (dist / 110.574) * math.cos(angle);
+    final dLng = (dist / (111.320 * math.cos(lat * 3.14159 / 180))) *
+        math.sin(angle);
+    return (
+      double.parse((lat + dLat).toStringAsFixed(4)),
+      double.parse((lng + dLng).toStringAsFixed(4)),
+    );
+  }
+
+  Future<void> _save() async {
+    final draft = ref.read(setupDraftProvider);
+    final country = ref.read(countryProvider);
+    final city = ref.read(cityProvider);
+
+    setState(() => _saving = true);
+
+    final point = _jitter(city.lat, city.lng);
+    final error = await ref.read(profileRepositoryProvider).upsert(
+          displayName: draft.displayName,
+          username: draft.username,
+          bio: draft.bio,
+          countryCode: country.code,
+          cityId: city.id,
+          lat: point.$1,
+          lng: point.$2,
+          locale: ref.read(localeProvider).languageCode,
+        );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(myProfileProvider);
+    if (mounted) context.go(R.onbWishlist);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final ar = context.s.isArabic;
     final country = ref.watch(countryProvider);
     final city = ref.watch(cityProvider);
@@ -114,7 +176,8 @@ class LocationSetupScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(GSpace.screenH),
               child: GButton(
                 label: context.tr('common.continue'),
-                onPressed: () => context.go(R.onbWishlist),
+                loading: _saving,
+                onPressed: _save,
               ),
             ),
           ],

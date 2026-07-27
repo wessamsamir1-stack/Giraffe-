@@ -51,3 +51,41 @@ $$;
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth   to anon, authenticated, service_role;
 grant select on auth.users   to authenticated, service_role;
+
+
+-- =============================================================================
+-- بديل سكيما storage — محلي فقط
+--
+-- عشان نقدر نصرّف سياسات التخزين ونتأكد إنها سليمة نحوياً من غير سوبابيز.
+-- =============================================================================
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  public             boolean not null default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[],
+  created_at         timestamptz not null default now()
+);
+
+create table if not exists storage.objects (
+  id         uuid primary key default gen_random_uuid(),
+  bucket_id  text not null references storage.buckets(id),
+  name       text not null,
+  owner      uuid,
+  created_at timestamptz not null default now()
+);
+
+alter table storage.objects enable row level security;
+
+create or replace function storage.foldername(name text)
+returns text[]
+language sql
+immutable
+as $$
+  select string_to_array(name, '/')
+$$;
+
+grant usage on schema storage to anon, authenticated;
+grant select, insert, update, delete on storage.objects to authenticated;

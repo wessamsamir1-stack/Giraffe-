@@ -1,21 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/item_card.dart';
 
-class MyItemsScreen extends StatelessWidget {
+class MyItemsScreen extends ConsumerWidget {
   const MyItemsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final items = Mock.myItems;
+    final async = ref.watch(myItemsProvider);
+
+    return switch (async) {
+      AsyncLoading() => _shell(context, ref, const _ItemsSkeleton()),
+      AsyncError() => _shell(
+          context,
+          ref,
+          GEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: context.tr('common.error'),
+            body: context.tr('common.errorBody'),
+            actionLabel: context.tr('common.retry'),
+            onAction: () => ref.invalidate(myItemsProvider),
+          ),
+        ),
+      _ => _shell(context, ref, _body(context, c, async.value ?? const [])),
+    };
+  }
+
+  Widget _shell(BuildContext context, WidgetRef ref, Widget child) {
 
     return Scaffold(
       appBar: AppBar(
@@ -29,7 +50,15 @@ class MyItemsScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: items.isEmpty
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(myItemsProvider),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, GColors c, List<Item> items) {
+    return items.isEmpty
           ? GEmptyState(
               icon: Icons.inventory_2_outlined,
               tone: GEmptyTone.brand,
@@ -89,7 +118,26 @@ class MyItemsScreen extends StatelessWidget {
                     ),
                   ),
               ],
-            ),
+            );
+  }
+}
+
+class _ItemsSkeleton extends StatelessWidget {
+  const _ItemsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(GSpace.screenH),
+      children: [
+        const GSkeleton(height: 74, radius: GRadius.brLg),
+        const SizedBox(height: GSpace.xl),
+        for (var i = 0; i < 3; i++)
+          const Padding(
+            padding: EdgeInsets.only(bottom: GSpace.md),
+            child: GSkeleton(height: 92, radius: GRadius.brLg),
+          ),
+      ],
     );
   }
 }

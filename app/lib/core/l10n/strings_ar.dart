@@ -120,6 +120,8 @@ const Map<String, String> kAr = {
   'auth.err.weakPassword': 'كلمة السر لازم تحقق كل الشروط',
   'auth.err.termsRequired': 'لازم توافق على الشروط',
   'auth.err.ageRequired': 'لازم تأكد إن عمرك 18 سنة أو أكثر',
+  'auth.err.usernameTaken': 'اسم المستخدم ده محجوز — جرّب غيره',
+  'auth.err.offline': 'مفيش اتصال. التطبيق شغال على بيانات تجريبية.',
 
   // ------------------------------------------------------------ الإعداد الأولي
   'setup.profile.title': 'عرّفنا بنفسك',

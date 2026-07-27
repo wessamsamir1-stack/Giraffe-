@@ -1,21 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -25,11 +27,35 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    // في النسخة النهائية القرار بيتاخد من حالة الجلسة.
-    // دلوقتي بندخل على الترحيب عشان نقدر نستعرض كل المسارات.
-    Timer(const Duration(milliseconds: 1100), () {
+    Timer(const Duration(milliseconds: 1000), _decideRoute);
+  }
+
+  /// وجهة الفتح بتتحدد من حالة الجلسة ومدى اكتمال الإعداد.
+  ///
+  /// الترتيب مقصود: **قائمة الرغبات إجبارية** قبل الوصول للتطبيق، لأن
+  /// من غيرها محرك المطابقة مابيشتغلش والـ deck بيبقى فاضي.
+  Future<void> _decideRoute() async {
+    if (!mounted) return;
+
+    final auth = ref.read(authRepositoryProvider);
+
+    if (!auth.isSignedIn) {
       if (mounted) context.go(R.onbIntro);
-    });
+      return;
+    }
+
+    final profile = await ref.read(profileRepositoryProvider).myProfile();
+    if (!mounted) return;
+
+    if (profile == null) {
+      context.go(R.onbProfile);
+      return;
+    }
+
+    final ready = await ref.read(wishlistRepositoryProvider).isSetupComplete();
+    if (!mounted) return;
+
+    context.go(ready ? R.market : R.onbWishlist);
   }
 
   @override

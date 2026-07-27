@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_state.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/security/validators.dart';
+import '../../data/repositories/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
 
-class ProfileSetupScreen extends StatefulWidget {
+class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
 
   @override
-  State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
+  ConsumerState<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
 }
 
-class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _name = TextEditingController();
   final _username = TextEditingController();
   final _bio = TextEditingController();
@@ -25,16 +28,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _nameError;
   String? _usernameError;
 
-  void _submit() {
+  bool _checking = false;
+
+  Future<void> _submit() async {
     final nameError = Validators.displayName(_name.text);
     final usernameError = Validators.username(_username.text);
     setState(() {
       _nameError = nameError;
       _usernameError = usernameError;
     });
-    if (nameError == null && usernameError == null) {
-      context.go(R.onbLocation);
+    if (nameError != null || usernameError != null) return;
+
+    setState(() => _checking = true);
+    final free = await ref
+        .read(profileRepositoryProvider)
+        .isUsernameAvailable(_username.text);
+    if (!mounted) return;
+    setState(() => _checking = false);
+
+    if (!free) {
+      setState(() => _usernameError = 'auth.err.usernameTaken');
+      return;
     }
+
+    // البيانات بتتحفظ مع الموقع في خطوة واحدة — عشان مانعملش ملف ناقص
+    ref.read(setupDraftProvider.notifier).state = SetupDraft(
+      displayName: _name.text.trim(),
+      username: _username.text.trim().toLowerCase(),
+      bio: _bio.text.trim(),
+    );
+
+    if (mounted) context.go(R.onbLocation);
   }
 
   @override
@@ -158,6 +182,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             const SizedBox(height: GSpace.xxxl),
             GButton(
               label: context.tr('common.continue'),
+              loading: _checking,
               onPressed: _submit,
             ),
           ],

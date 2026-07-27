@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_state.dart';
@@ -6,18 +7,18 @@ import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 
-class MatchesScreen extends StatefulWidget {
+class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
 
   @override
-  State<MatchesScreen> createState() => _MatchesScreenState();
+  ConsumerState<MatchesScreen> createState() => _MatchesScreenState();
 }
 
-class _MatchesScreenState extends State<MatchesScreen>
+class _MatchesScreenState extends ConsumerState<MatchesScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 2, vsync: this);
 
@@ -31,8 +32,9 @@ class _MatchesScreenState extends State<MatchesScreen>
   Widget build(BuildContext context) {
     final c = context.colors;
 
-    final active = Mock.matches.where((m) => !m.archived).toList();
-    final archived = Mock.matches.where((m) => m.archived).toList();
+    final active = ref.watch(matchesProvider(false));
+    final archived = ref.watch(matchesProvider(true));
+    final activeCount = active.valueOrNull?.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +56,7 @@ class _MatchesScreenState extends State<MatchesScreen>
                     const SizedBox(width: GSpace.xs),
                     Text(
                       context.trf('matches.roomsCount', {
-                        'n': active.length,
+                        'n': activeCount,
                         'max': kMaxActiveRooms,
                       }),
                       style: Theme.of(context).textTheme.bodySmall,
@@ -81,11 +83,41 @@ class _MatchesScreenState extends State<MatchesScreen>
       body: TabBarView(
         controller: _tabs,
         children: [
-          _list(context, active),
-          _list(context, archived),
+          _pane(context, active, archived: false),
+          _pane(context, archived, archived: true),
         ],
       ),
     );
+  }
+
+  Widget _pane(
+    BuildContext context,
+    AsyncValue<List<TradeMatch>> async, {
+    required bool archived,
+  }) {
+    return switch (async) {
+      AsyncLoading() => ListView(
+          padding: const EdgeInsets.all(GSpace.screenH),
+          children: const [
+            GSkeleton(height: 96, radius: GRadius.brLg),
+            SizedBox(height: GSpace.md),
+            GSkeleton(height: 96, radius: GRadius.brLg),
+            SizedBox(height: GSpace.md),
+            GSkeleton(height: 96, radius: GRadius.brLg),
+          ],
+        ),
+      AsyncError() => GEmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: context.tr('common.error'),
+          body: context.tr('common.errorBody'),
+          actionLabel: context.tr('common.retry'),
+          onAction: () => ref.invalidate(matchesProvider(archived)),
+        ),
+      _ => RefreshIndicator(
+          onRefresh: () async => ref.invalidate(matchesProvider(archived)),
+          child: _list(context, async.value ?? const []),
+        ),
+    };
   }
 
   Widget _list(BuildContext context, List<TradeMatch> matches) {
@@ -117,7 +149,6 @@ class _MatchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final ar = context.s.isArabic;
 
     final stageColor = switch (match.stage) {
       TradeStage.completed => c.success,
@@ -167,7 +198,7 @@ class _MatchRow extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        match.myItem.title(ar),
+                        match.myItem.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -183,7 +214,7 @@ class _MatchRow extends StatelessWidget {
                     ),
                     Flexible(
                       child: Text(
-                        match.theirItem.title(ar),
+                        match.theirItem.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,

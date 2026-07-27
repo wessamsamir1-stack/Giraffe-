@@ -8,7 +8,8 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/item_card.dart';
@@ -22,14 +23,17 @@ class MarketScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.colors;
     final ar = context.s.isArabic;
     final city = ref.watch(cityProvider);
+    final feed = ref.watch(marketFeedProvider(null));
+    final items = feed.valueOrNull ?? const <Item>[];
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
+        child: RefreshIndicator(
+          onRefresh: () async => ref.invalidate(marketFeedProvider),
+          child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _Header(cityName: city.name(ar))),
 
@@ -88,10 +92,10 @@ class MarketScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: GSpace.screenH,
                   ),
-                  itemCount: 3,
+                  itemCount: items.length < 3 ? items.length : 3,
                   separatorBuilder: (_, __) => const SizedBox(width: GSpace.md),
                   itemBuilder: (context, i) {
-                    final item = Mock.marketItems[i];
+                    final item = items[i];
                     return SizedBox(
                       width: 176,
                       child: ItemCard(
@@ -121,11 +125,7 @@ class MarketScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(
                   horizontal: GSpace.screenH,
                 ),
-                child: ItemRow(
-                  item: Mock.designService,
-                  showStatus: false,
-                  onTap: () => context.push(R.item(Mock.designService.id)),
-                ),
+                child: _ServiceTeaser(items: items),
               ),
             ),
 
@@ -153,18 +153,80 @@ class MarketScreen extends ConsumerWidget {
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
-                    final item = Mock.marketItems[i];
+                    final item = items[i];
                     return ItemCard(
                       item: item,
                       onTap: () => context.push(R.item(item.id)),
                     );
                   },
-                  childCount: Mock.marketItems.length,
+                  childCount: items.length,
                 ),
               ),
             ),
+
+            if (feed.isLoading && items.isEmpty)
+              const SliverToBoxAdapter(child: _MarketSkeleton()),
+
+            if (!feed.isLoading && items.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: GSpace.xxxl),
+                  child: GEmptyState(
+                    icon: Icons.storefront_outlined,
+                    tone: GEmptyTone.brand,
+                    title: context.tr('market.emptyCategory'),
+                    body: context.tr('market.emptyCategoryBody'),
+                    actionLabel: context.tr('items.add'),
+                    onAction: () => context.push(R.addItem),
+                  ),
+                ),
+              ),
           ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// أول خدمة في السوق — القسم الوحيد اللي مايتأثرش بحدود المدينة.
+class _ServiceTeaser extends StatelessWidget {
+  const _ServiceTeaser({required this.items});
+
+  final List<Item> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final services = items.where((i) => i.isService).toList();
+    if (services.isEmpty) {
+      return GNotice(
+        icon: Icons.swap_horiz_rounded,
+        text: context.tr('market.emptyCategoryBody'),
+      );
+    }
+    return ItemRow(
+      item: services.first,
+      showStatus: false,
+      onTap: () => context.push(R.item(services.first.id)),
+    );
+  }
+}
+
+class _MarketSkeleton extends StatelessWidget {
+  const _MarketSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: GSpace.screenH),
+      child: Column(
+        children: [
+          for (var i = 0; i < 3; i++)
+            const Padding(
+              padding: EdgeInsets.only(bottom: GSpace.md),
+              child: GSkeleton(height: 120, radius: GRadius.brLg),
+            ),
+        ],
       ),
     );
   }

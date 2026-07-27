@@ -3,18 +3,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/app_state.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/deck_repository.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import 'trade_swipe_card.dart';
 
 /// شاشة السحب — قلب التطبيق.
+///
+/// ملاحظة معمارية: التطبيق **مابيقررش الماتش**. كل سحبة بتروح للقاعدة
+/// عبر `record_swipe` وهي اللي بترجّع هل حصل ماتش ولا لأ. لو الحساب كان
+/// هنا، أي حد يقدر يتحايل عليه.
 class DeckScreen extends ConsumerStatefulWidget {
   const DeckScreen({super.key});
 
@@ -22,13 +26,13 @@ class DeckScreen extends ConsumerStatefulWidget {
   ConsumerState<DeckScreen> createState() => _DeckScreenState();
 }
 
-class _DeckScreenState extends ConsumerState<DeckScreen>
-    with SingleTickerProviderStateMixin {
-  late final List<TradeCandidate> _cards = List.of(Mock.deck);
+class _DeckScreenState extends ConsumerState<DeckScreen> {
+  final List<TradeCandidate> _cards = [];
   final List<TradeCandidate> _history = [];
 
   Offset _drag = Offset.zero;
-  bool _animatingOut = false;
+  bool _busy = false;
+  bool _seeded = false;
 
   static const double _thresholdX = 110;
   static const double _thresholdY = 130;
@@ -44,158 +48,212 @@ class _DeckScreenState extends ConsumerState<DeckScreen>
     return null;
   }
 
-  void _commit(SwipeIntent intent) {
+  // ---------------------------------------------------------------------------
+  Future<void> _commit(SwipeIntent intent) async {
     final card = _top;
-    if (card == null || _animatingOut) return;
+    if (card == null || _busy) return;
 
     HapticFeedback.lightImpact();
 
     setState(() {
+      _busy = true;
       _history.add(card);
       _cards.removeAt(0);
       _drag = Offset.zero;
     });
 
-    if (intent == SwipeIntent.skip) return;
+    final result = await ref.read(deckRepositoryProvider).swipe(
+          targetItemId: card.theirItem.id,
+          offeredItemId: card.myItem.id,
+          intent: intent,
+        );
 
-    // خصم من الحد اليومي
-    final left = ref.read(swipesLeftProvider);
-    ref.read(swipesLeftProvider.notifier).state = (left - 1).clamp(0, 999);
+    if (!mounted) return;
+    setState(() => _busy = false);
 
-    if (intent == SwipeIntent.dream) {
-      final dreams = ref.read(dreamsLeftProvider);
-      ref.read(dreamsLeftProvider.notifier).state = (dreams - 1).clamp(0, 99);
-    }
-
-    // في النسخة النهائية الماتش بيتحدد من الخادم.
-    // هنا بنحاكي: أول كارت بيعمل ماتش عشان نقدر نستعرض الشاشة.
-    if (card.id == 'tc_1') {
-      Future.microtask(() {
-        if (mounted) context.push(R.matchCelebrate('m_1'));
+    if (!result.ok) {
+      // الكارت يرجع مكانه — السحبة ما اتسجلتش
+      setState(() {
+        _cards.insert(0, card);
+        if (_history.isNotEmpty) _history.removeLast();
       });
+      _toast(context.tr(result.errorKey ?? 'common.error'));
+      return;
     }
+
+    ref.invalidate(swipeQuotaProvider);
+
+    if (result.matched && result.matchId != null) {
+      await context.push(R.matchCelebrate(result.matchId!));
+      if (mounted) ref.invalidate(matchesProvider);
+    }
+
+    // نجيب دفعة جديدة قبل ما الكروت تخلص خالص
+    if (_cards.length <= 2) await _loadMore();
   }
 
-  void _undo() {
-    if (_history.isEmpty) return;
+  Future<void> _undo() async {
+    if (_history.isEmpty || _busy) return;
     HapticFeedback.selectionClick();
+
+    setState(() => _busy = true);
+    final ok = await ref.read(deckRepositoryProvider).undo();
+    if (!mounted) return;
+
     setState(() {
-      _cards.insert(0, _history.removeLast());
-      _drag = Offset.zero;
+      _busy = false;
+      if (ok) {
+        _cards.insert(0, _history.removeLast());
+        _drag = Offset.zero;
+      }
+    });
+
+    if (!ok && mounted) _toast(context.tr('common.error'));
+    ref.invalidate(swipeQuotaProvider);
+  }
+
+  Future<void> _loadMore() async {
+    final fresh = await ref.read(deckRepositoryProvider).deck();
+    if (!mounted) return;
+
+    final known = {
+      for (final card in [..._cards, ..._history]) card.id,
+    };
+    setState(() {
+      _cards.addAll(fresh.where((card) => !known.contains(card.id)));
     });
   }
 
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final swipesLeft = ref.watch(swipesLeftProvider);
+    final deck = ref.watch(deckProvider);
+    final quota = ref.watch(swipeQuotaProvider);
 
-    if (swipesLeft <= 0) {
-      return _wrap(
-        context,
-        GEmptyState(
-          icon: Icons.hourglass_bottom_rounded,
-          tone: GEmptyTone.brand,
-          title: context.tr('deck.limitReached.title'),
-          body: context.tr('deck.limitReached.body'),
-          actionLabel: context.tr('market.title'),
-          onAction: () => context.go(R.market),
-        ),
-      );
-    }
+    // أول تحميل بس — بعد كده الحالة محلية عشان السحب يفضل سلس
+    deck.whenData((cards) {
+      if (!_seeded) {
+        _seeded = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _cards.addAll(cards));
+        });
+      }
+    });
 
-    if (_cards.isEmpty) {
-      return _wrap(
-        context,
-        GEmptyState(
-          icon: Icons.style_rounded,
-          tone: GEmptyTone.brand,
-          title: context.tr('deck.empty.title'),
-          body: context.tr('deck.empty.body'),
-          actionLabel: context.tr('deck.empty.addItem'),
-          onAction: () => context.push(R.addItem),
-          secondaryLabel: context.tr('deck.empty.editWishlist'),
-          onSecondary: () => context.push(R.wishlist),
-        ),
-      );
-    }
+    final swipesLeft = quota.valueOrNull?.swipes ?? 50;
+    final dreamsLeft = quota.valueOrNull?.dreams ?? 3;
 
     return _wrap(
       context,
-      Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                GSpace.lg,
-                GSpace.sm,
-                GSpace.lg,
-                GSpace.md,
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // الكارت اللي وراه
-                  if (_cards.length > 1)
-                    Transform.scale(
-                      scale: 0.94,
-                      child: Transform.translate(
-                        offset: const Offset(0, 14),
-                        child: Opacity(
-                          opacity: 0.6,
-                          child: IgnorePointer(
-                            child: TradeSwipeCard(candidate: _cards[1]),
+      switch (deck) {
+        AsyncError() => GEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: context.tr('common.error'),
+            body: context.tr('common.errorBody'),
+            actionLabel: context.tr('common.retry'),
+            onAction: () => ref.invalidate(deckProvider),
+          ),
+        AsyncLoading() when _cards.isEmpty => const _DeckSkeleton(),
+        _ when swipesLeft <= 0 => GEmptyState(
+            icon: Icons.hourglass_bottom_rounded,
+            tone: GEmptyTone.brand,
+            title: context.tr('deck.limitReached.title'),
+            body: context.tr('deck.limitReached.body'),
+            actionLabel: context.tr('market.title'),
+            onAction: () => context.go(R.market),
+          ),
+        _ when _cards.isEmpty => GEmptyState(
+            icon: Icons.style_rounded,
+            tone: GEmptyTone.brand,
+            title: context.tr('deck.empty.title'),
+            body: context.tr('deck.empty.body'),
+            actionLabel: context.tr('deck.empty.addItem'),
+            onAction: () => context.push(R.addItem),
+            secondaryLabel: context.tr('deck.empty.editWishlist'),
+            onSecondary: () => context.push(R.wishlist),
+          ),
+        _ => Column(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    GSpace.lg,
+                    GSpace.sm,
+                    GSpace.lg,
+                    GSpace.md,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (_cards.length > 1)
+                        Transform.scale(
+                          scale: 0.94,
+                          child: Transform.translate(
+                            offset: const Offset(0, 14),
+                            child: Opacity(
+                              opacity: 0.6,
+                              child: IgnorePointer(
+                                child: TradeSwipeCard(candidate: _cards[1]),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-
-                  // الكارت العلوي
-                  _draggableTop(context),
-                ],
+                      _draggableTop(context),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              _ActionBar(
+                onSkip: () => _commit(SwipeIntent.skip),
+                onInterested: () => _commit(SwipeIntent.interested),
+                onDream: () => _commit(SwipeIntent.dream),
+                onUndo: _history.isEmpty ? null : _undo,
+                dreamsLeft: dreamsLeft,
+              ),
+              const SizedBox(height: GSpace.sm),
+              Text(
+                context.trf('deck.dailyLeft', {'n': swipesLeft}),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: c.textTertiary),
+              ),
+              const SizedBox(height: GSpace.md),
+            ],
           ),
-
-          _ActionBar(
-            onSkip: () => _commit(SwipeIntent.skip),
-            onInterested: () => _commit(SwipeIntent.interested),
-            onDream: () => _commit(SwipeIntent.dream),
-            onUndo: _history.isEmpty ? null : _undo,
-            dreamsLeft: ref.watch(dreamsLeftProvider),
-          ),
-          const SizedBox(height: GSpace.sm),
-          Text(
-            context.trf('deck.dailyLeft', {'n': swipesLeft}),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: c.textTertiary),
-          ),
-          const SizedBox(height: GSpace.md),
-        ],
-      ),
+      },
     );
   }
 
   Widget _draggableTop(BuildContext context) {
-    final card = _top!;
+    final card = _top;
+    if (card == null) return const SizedBox.shrink();
+
     final rotation = (_drag.dx / 1200).clamp(-0.18, 0.18);
     final intent = _currentIntent;
 
     return GestureDetector(
-      onPanUpdate: (details) => setState(() => _drag += details.delta),
-      onPanEnd: (_) {
-        if (_drag.dy < -_thresholdY && _drag.dy.abs() > _drag.dx.abs()) {
-          _commit(SwipeIntent.dream);
-        } else if (_drag.dx > _thresholdX) {
-          _commit(SwipeIntent.interested);
-        } else if (_drag.dx < -_thresholdX) {
-          _commit(SwipeIntent.skip);
-        } else {
-          setState(() => _drag = Offset.zero);
-        }
-      },
+      onPanUpdate: _busy ? null : (d) => setState(() => _drag += d.delta),
+      onPanEnd: _busy
+          ? null
+          : (_) {
+              if (_drag.dy < -_thresholdY && _drag.dy.abs() > _drag.dx.abs()) {
+                _commit(SwipeIntent.dream);
+              } else if (_drag.dx > _thresholdX) {
+                _commit(SwipeIntent.interested);
+              } else if (_drag.dx < -_thresholdX) {
+                _commit(SwipeIntent.skip);
+              } else {
+                setState(() => _drag = Offset.zero);
+              }
+            },
       child: AnimatedContainer(
         duration: _drag == Offset.zero ? GDuration.base : Duration.zero,
         curve: GCurve.spring,
@@ -250,6 +308,36 @@ class _DeckScreenState extends ConsumerState<DeckScreen>
   }
 }
 
+/// كارت هيكلي أثناء أول تحميل.
+class _DeckSkeleton extends StatelessWidget {
+  const _DeckSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(GSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Expanded(child: GSkeleton(radius: GRadius.brXxl)),
+          const SizedBox(height: GSpace.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              4,
+              (_) => const Padding(
+                padding: EdgeInsets.symmetric(horizontal: GSpace.sm),
+                child: GSkeleton(width: 52, height: 52, radius: GRadius.brPill),
+              ),
+            ),
+          ),
+          const SizedBox(height: GSpace.xxl),
+        ],
+      ),
+    );
+  }
+}
+
 class _ActionBar extends StatelessWidget {
   const _ActionBar({
     required this.onSkip,
@@ -272,9 +360,8 @@ class _ActionBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // زر التراجع — مجاني للجميع عن عمد.
-        // في المقايضة السحبة الغلط مؤلمة أكتر من تطبيقات التعارف،
-        // فتحويله لميزة مدفوعة معناه بيع حل لمشكلة إحنا سببناها.
+        // التراجع مجاني للجميع عن عمد. في المقايضة السحبة الغلط مؤلمة
+        // أكتر من تطبيقات التعارف — بيع الحل لمشكلة إحنا سببناها قرار سيء.
         GIconButton(
           icon: Icons.replay_rounded,
           size: 46,
