@@ -264,6 +264,11 @@ const Map<String, String> kEn = {
   'complete.scan': 'Scan their code',
   'complete.waiting': 'Waiting for {name} to confirm',
   'complete.done': 'Done! Trade completed',
+  'complete.theirCode': 'Enter the other person\'s code',
+  'complete.err.code': 'Wrong code. Make sure it is theirs, not yours',
+  'complete.err.attempts': 'Too many attempts. Contact support',
+  'complete.err.order': 'Open this screen at the meeting to get your code',
+  'complete.err.closed': 'This room is closed',
 
   'rate.title': 'Rate this trade',
   'rate.overall': 'Overall',

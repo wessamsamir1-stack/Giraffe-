@@ -265,6 +265,11 @@ const Map<String, String> kAr = {
   'complete.scan': 'امسح كوده',
   'complete.waiting': 'في انتظار تأكيد {name}',
   'complete.done': 'مبروك! الصفقة اتمّت',
+  'complete.theirCode': 'اكتب كود الطرف التاني',
+  'complete.err.code': 'الكود غلط. اتأكد إنك بتكتب كود التاني مش كودك',
+  'complete.err.attempts': 'محاولات كتير. كلّم الدعم',
+  'complete.err.order': 'افتح الشاشة دي عند اللقاء عشان يتولّد كودك',
+  'complete.err.closed': 'الغرفة مقفولة',
 
   'rate.title': 'قيّم الصفقة',
   'rate.overall': 'التقييم العام',

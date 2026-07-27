@@ -235,22 +235,65 @@ class MatchesRepository {
 
   /// تأكيد الإتمام. الصفقة مابتكتملش إلا لما **الطرفين** يأكدوا —
   /// محفّز في القاعدة هو اللي بيقفلها.
+  /// إصدار كودي أنا — **بيتولّد على الخادم**.
+  ///
+  /// بيرجّع نفس الكود لو اتنادى تاني، عشان الطرف التاني مايلاقيش
+  /// الكود اتغير وهو بيمسحه.
+  Future<String?> issueTradeCode(String matchId) async {
+    if (!hasBackend) return 'GRF-DEMO24';
+
+    try {
+      final code = await _client.rpc(
+        'issue_trade_code',
+        params: {'p_match': matchId},
+      );
+      return code as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// التأكيد بمسح كود الطرف التاني.
+  ///
+  /// القاعدة: الكود اللي بمسحه بتاع التاني، واللي بيتأكد هو **صفي أنا**.
+  /// يعني مستحيل أأكد من غير ما أكون شايف شاشته.
+  ///
+  /// بترجع `null` لو نجح، أو مفتاح ترجمة للخطأ.
   Future<String?> confirmTrade(String matchId, String code) async {
     if (!hasBackend) return null;
 
-    final me = _me;
-    if (me == null) return 'auth.err.generic';
-
     try {
-      await _client.from('trade_confirmations').upsert({
-        'match_id': matchId,
-        'user_id': me,
-        'code': code,
-        'confirmed_at': DateTime.now().toIso8601String(),
-      });
-      return null;
+      final result = await _client.rpc(
+        'confirm_trade',
+        params: {'p_match': matchId, 'p_code': code},
+      ) as Map<String, dynamic>;
+
+      if (result['ok'] == true) return null;
+
+      return switch (result['error']) {
+        'invalid_code' => 'complete.err.code',
+        'too_many_attempts' => 'complete.err.attempts',
+        'issue_code_first' => 'complete.err.order',
+        'room_closed' => 'complete.err.closed',
+        _ => 'common.error',
+      };
     } catch (_) {
       return 'common.error';
+    }
+  }
+
+  /// هل الطرف التاني أكّد؟ — من غير ما نكشف كوده.
+  Future<bool> otherSideConfirmed(String matchId) async {
+    if (!hasBackend) return false;
+
+    try {
+      final done = await _client.rpc(
+        'other_side_confirmed',
+        params: {'p_match': matchId},
+      );
+      return done == true;
+    } catch (_) {
+      return false;
     }
   }
 

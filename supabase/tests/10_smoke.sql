@@ -849,4 +849,213 @@ begin
 end $$;
 
 
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 18. كود الإتمام — لازم تشوف شاشة التاني'; end $$;
+-- =============================================================================
+
+-- منتجات وغرفة نضيفة للاختبار ده
+insert into public.items
+  (id, owner_id, title, category_id, condition, status, moderation,
+   value_min, value_max, currency_code, country_code, city_id, published_at)
+values
+  ('bbbbbbbb-0000-0000-0000-000000000001',
+   '11111111-1111-1111-1111-111111111111',
+   'لابتوب ديل للمقايضة', 'computers', 'good', 'available', 'approved',
+   9000, 11000, 'EGP', 'EG', 'cairo', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000002',
+   '22222222-2222-2222-2222-222222222222',
+   'كاميرا كانون للمقايضة', 'cameras', 'good', 'available', 'approved',
+   9500, 11500, 'EGP', 'EG', 'giza', now()),
+  ('bbbbbbbb-0000-0000-0000-000000000003',
+   '33333333-3333-3333-3333-333333333333',
+   'دراجة هوائية للمقايضة', 'sports', 'good', 'available', 'approved',
+   4000, 6000, 'EGP', 'EG', 'cairo', now());
+
+do $$
+declare
+  v_match uuid;
+begin
+  insert into public.matches (id, user_a, user_b, item_a, item_b, stage)
+  values (gen_random_uuid(),
+          '11111111-1111-1111-1111-111111111111',
+          '22222222-2222-2222-2222-222222222222',
+          'bbbbbbbb-0000-0000-0000-000000000001',
+          'bbbbbbbb-0000-0000-0000-000000000002',
+          'negotiating')
+  returning id into v_match;
+
+  create temp table t_match as select v_match as id;
+end $$;
+
+do $$
+declare
+  v_match uuid := (select id from t_match);
+  code_a  text;
+  code_b  text;
+  again   text;
+begin
+  -- كل طرف بيصدر كوده
+  perform set_config('request.jwt.claim.sub',
+                     '11111111-1111-1111-1111-111111111111', true);
+  code_a := public.issue_trade_code(v_match);
+
+  perform set_config('request.jwt.claim.sub',
+                     '22222222-2222-2222-2222-222222222222', true);
+  code_b := public.issue_trade_code(v_match);
+
+  perform public.assert_eq(length(code_a), 8, 'الكود 8 خانات');
+  perform public.assert_true(code_a <> code_b, 'كل طرف له كود مختلف');
+
+  -- الكود مش مشتق من رقم الغرفة — ده كان جوهر المشكلة القديمة
+  perform public.assert_true(
+    code_a <> upper(substring(replace(v_match::text, '-', ''), 1, 8)),
+    'الكود مش مشتق من رقم الغرفة');
+
+  -- الأبجدية من غير الحروف اللي بتتلخبط
+  perform public.assert_true(code_a !~ '[01OIL]',
+    'مفيش حروف بتتلخبط في القراءة');
+
+  -- الإصدار ثابت: نفس الكود لو اتنادى تاني
+  perform set_config('request.jwt.claim.sub',
+                     '11111111-1111-1111-1111-111111111111', true);
+  again := public.issue_trade_code(v_match);
+  perform public.assert_eq(again, code_a, 'الكود مابيتغيرش لو الشاشة اتفتحت تاني');
+end $$;
+
+do $$
+declare
+  v_match uuid := (select id from t_match);
+  code_a  text;
+  code_b  text;
+  res     jsonb;
+  n       int;
+begin
+  select code into code_a from public.trade_confirmations
+   where match_id = v_match and user_id = '11111111-1111-1111-1111-111111111111';
+  select code into code_b from public.trade_confirmations
+   where match_id = v_match and user_id = '22222222-2222-2222-2222-222222222222';
+
+  -- ---------------------------------------------------------------------------
+  -- المحاولة اللي كانت شغالة قبل كده: أكّد نفسك بكودك
+  -- ---------------------------------------------------------------------------
+  perform set_config('request.jwt.claim.sub',
+                     '11111111-1111-1111-1111-111111111111', true);
+
+  res := public.confirm_trade(v_match, code_a);
+  perform public.assert_eq(res->>'error', 'invalid_code',
+    'مسح كودي أنا مابيأكدش حاجة');
+
+  -- كود مخترع
+  res := public.confirm_trade(v_match, 'ZZZZZZZZ');
+  perform public.assert_eq(res->>'error', 'invalid_code',
+    'الكود المخترع مابيعديش');
+
+  -- ---------------------------------------------------------------------------
+  -- المسار الصح: وسام بيمسح كود أحمد → صف وسام هو اللي بيتأكد
+  -- ---------------------------------------------------------------------------
+  res := public.confirm_trade(v_match, code_b);
+  perform public.assert_true((res->>'ok')::boolean, 'مسح كود التاني نجح');
+  perform public.assert_eq((res->>'completed')::boolean, false,
+    'طرف واحد مايكملش الصفقة');
+
+  select count(*)::int into n from public.trade_confirmations
+   where match_id = v_match
+     and user_id = '11111111-1111-1111-1111-111111111111'
+     and confirmed_at is not null;
+  perform public.assert_eq(n, 1, 'اللي اتأكد هو صف وسام مش صف أحمد');
+
+  -- والغرفة لسه مش مكتملة
+  select count(*)::int into n from public.matches
+   where id = v_match and stage = 'completed';
+  perform public.assert_eq(n, 0, 'الصفقة لسه مقفلتش بطرف واحد');
+
+  -- ---------------------------------------------------------------------------
+  -- أحمد بيمسح كود وسام → الصفقة بتكتمل
+  -- ---------------------------------------------------------------------------
+  perform set_config('request.jwt.claim.sub',
+                     '22222222-2222-2222-2222-222222222222', true);
+
+  res := public.confirm_trade(v_match, code_a);
+  perform public.assert_true((res->>'completed')::boolean,
+    'الطرفين أكدوا → الصفقة اكتملت');
+
+  select count(*)::int into n from public.matches
+   where id = v_match and stage = 'completed' and closed_at is not null;
+  perform public.assert_eq(n, 1, 'الغرفة اتقفلت مكتملة');
+
+  select count(*)::int into n from public.items
+   where id in ('bbbbbbbb-0000-0000-0000-000000000001',
+                'bbbbbbbb-0000-0000-0000-000000000002')
+     and status = 'traded';
+  perform public.assert_eq(n, 2, 'المنتجين اتسجلوا متقايضين');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- سقف المحاولات
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_match uuid;
+  res     jsonb;
+  i       int;
+begin
+  insert into public.matches (id, user_a, user_b, item_a, item_b, stage)
+  values (gen_random_uuid(),
+          '11111111-1111-1111-1111-111111111111',
+          '33333333-3333-3333-3333-333333333333',
+          'bbbbbbbb-0000-0000-0000-000000000001',
+          'bbbbbbbb-0000-0000-0000-000000000003',
+          'negotiating')
+  returning id into v_match;
+
+  perform set_config('request.jwt.claim.sub',
+                     '11111111-1111-1111-1111-111111111111', true);
+  perform public.issue_trade_code(v_match);
+
+  for i in 1..5 loop
+    res := public.confirm_trade(v_match, 'AAAAAAAA');
+  end loop;
+
+  res := public.confirm_trade(v_match, 'AAAAAAAA');
+  perform public.assert_eq(res->>'error', 'too_many_attempts',
+    'سقف المحاولات بيتفرض بعد 5');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- والعميل مابيقدرش يكتب على الجدول مباشرةً — ده الباب الحقيقي
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare
+  blocked boolean := false;
+begin
+  begin
+    insert into public.trade_confirmations
+      (match_id, user_id, code, confirmed_at)
+    values ((select id from t_match),
+            '11111111-1111-1111-1111-111111111111', 'HACKED11', now());
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+
+  perform public.assert_true(blocked,
+    'العميل مايقدرش يكتب تأكيد بنفسه');
+end $$;
+
+do $$
+declare
+  n int;
+begin
+  -- وكمان مايشوفش كود التاني
+  select count(*)::int into n from public.trade_confirmations
+   where user_id <> '11111111-1111-1111-1111-111111111111';
+  perform public.assert_eq(n, 0, 'كود الطرف التاني مخفي عني');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+
 do $$ begin raise notice E'\n✔ كل الاختبارات نجحت\n'; end $$;
