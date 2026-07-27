@@ -7,6 +7,7 @@ import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -91,6 +92,24 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+
+          // -------------------------------------------------------------------
+          // لوحة المراجعة — بتظهر للطاقم بس.
+          //
+          // الإخفاء ده **تحسين عرض مش حماية**: القاعدة هي اللي بترفض
+          // أي نداء من غير الطاقم، حتى لو حد وصل للمسار بأي طريقة.
+          // -------------------------------------------------------------------
+          if (ref.watch(amIStaffProvider).valueOrNull ?? false)
+            GSettingsGroup(
+              title: context.tr('mod.title'),
+              children: [
+                GSettingsTile(
+                  icon: Icons.rule_rounded,
+                  label: context.tr('mod.title'),
+                  onTap: () => context.push(R.modQueue),
+                ),
+              ],
+            ),
 
           GSettingsGroup(
             title: context.tr('settings.support'),

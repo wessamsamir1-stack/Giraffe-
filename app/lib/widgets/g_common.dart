@@ -101,12 +101,21 @@ class GChip extends StatelessWidget {
             Icon(icon, size: dense ? 13 : 15, color: fg),
             const SizedBox(width: GSpace.xs),
           ],
-          Text(
-            label,
-            style: (dense
-                    ? Theme.of(context).textTheme.labelSmall
-                    : Theme.of(context).textTheme.labelMedium)
-                ?.copyWith(color: fg),
+          // Flexible مش Text عادي.
+          //
+          // الشريحة بتتحط أحياناً جوه Expanded أو صف ضيق، ووقتها النص
+          // مايقدرش يقصّر فالصف بيطفح. mainAxisSize.min لوحده مابيحلش
+          // ده — هو بيقلل الحجم المطلوب، مش بيخلي المحتوى يتقلّص.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: (dense
+                      ? Theme.of(context).textTheme.labelSmall
+                      : Theme.of(context).textTheme.labelMedium)
+                  ?.copyWith(color: fg),
+            ),
           ),
         ],
       ),

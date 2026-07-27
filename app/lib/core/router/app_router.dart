@@ -16,6 +16,8 @@ import '../../features/items/wishlist_screen.dart';
 import '../../features/market/all_categories_screen.dart';
 import '../../features/market/category_screen.dart';
 import '../../features/market/market_screen.dart';
+import '../../features/moderation/moderation_queue_screen.dart';
+import '../../features/moderation/moderation_review_screen.dart';
 import '../../features/market/search_screen.dart';
 import '../../features/matches/complete_trade_screen.dart';
 import '../../features/matches/create_offer_screen.dart';
@@ -104,6 +106,10 @@ class R {
   static const settingsNotifications = '/settings/notifications';
   static const settingsSecurity = '/settings/security';
   static const settingsEmergency = '/settings/emergency';
+
+  // المراجعة البشرية — للطاقم بس، والقاعدة هي اللي بتفرض ده
+  static const modQueue = '/moderation';
+  static String modReview(String itemId) => '/moderation/$itemId';
 
   // عرضية
   static const notifications = '/notifications';
@@ -282,6 +288,15 @@ GoRouter buildRouter() {
         builder: (_, __) => const NotificationsScreen(),
       ),
       GoRoute(path: R.safety, builder: (_, __) => const SafetyCenterScreen()),
+
+      // --------------------------------------------------- المراجعة البشرية
+      GoRoute(path: R.modQueue, builder: (_, __) => const ModerationQueueScreen()),
+      GoRoute(
+        path: '/moderation/:itemId',
+        builder: (context, state) => ModerationReviewScreen(
+          itemId: state.pathParameters['itemId']!,
+        ),
+      ),
       GoRoute(
         path: '/report/:type/:id',
         builder: (context, state) => ReportScreen(

@@ -6,6 +6,7 @@ import 'ai_repository.dart';
 import 'auth_repository.dart';
 import 'deck_repository.dart';
 import 'items_repository.dart';
+import 'moderation_repository.dart';
 import 'matches_repository.dart';
 import 'notifications_repository.dart';
 import 'profile_repository.dart';
@@ -29,6 +30,8 @@ final storageRepositoryProvider = Provider((ref) => const StorageRepository());
 final notificationsRepositoryProvider =
     Provider((ref) => const NotificationsRepository());
 final aiRepositoryProvider = Provider((ref) => const AiRepository());
+final moderationRepositoryProvider =
+    Provider((ref) => const ModerationRepository());
 
 // =============================================================================
 // البيانات
@@ -163,3 +166,23 @@ String _marketGroupFor(String cityId) => switch (cityId) {
       'hurghada' => 'eg_redsea',
       _ => 'eg_greater_cairo',
     };
+
+
+// -----------------------------------------------------------------------------
+// المراجعة البشرية
+//
+// الصلاحية بتتفحص في القاعدة. الـ providers دي بتخفي اللوحة عن غير
+// الطاقم — وده تحسين عرض بس، مش حماية.
+// -----------------------------------------------------------------------------
+final amIStaffProvider = FutureProvider<bool>((ref) {
+  return ref.watch(moderationRepositoryProvider).amIStaff();
+});
+
+final moderationStatsProvider = FutureProvider<ModerationStats>((ref) {
+  return ref.watch(moderationRepositoryProvider).stats();
+});
+
+final moderationQueueProvider =
+    FutureProvider.family<List<QueueEntry>, FlagKind>((ref, kind) {
+  return ref.watch(moderationRepositoryProvider).queue(kind: kind);
+});

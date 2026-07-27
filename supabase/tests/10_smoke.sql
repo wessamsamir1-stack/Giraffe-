@@ -1058,4 +1058,259 @@ reset role;
 reset request.jwt.claim.sub;
 
 
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 19. لوحة المراجعة البشرية'; end $$;
+-- =============================================================================
+
+-- منى مراجعة
+insert into public.staff (user_id, role) values
+  ('33333333-3333-3333-3333-333333333333', 'moderator');
+
+-- منتجات معلّمة: واحد محتوى مشكوك فيه، واتنين عطل نظام
+insert into public.items
+  (id, owner_id, title, category_id, condition, status, moderation,
+   moderation_note, currency_code, country_code, city_id)
+values
+  ('cccccccc-0000-0000-0000-000000000001',
+   '11111111-1111-1111-1111-111111111111',
+   'منتج فيه شك', 'mobiles', 'good', 'pending', 'flagged',
+   'صور مش واضحة', 'EGP', 'EG', 'cairo'),
+  ('cccccccc-0000-0000-0000-000000000002',
+   '22222222-2222-2222-2222-222222222222',
+   'منتج النظام تعثّر فيه', 'cameras', 'good', 'pending', 'flagged',
+   'moderation_unavailable', 'EGP', 'EG', 'giza'),
+  ('cccccccc-0000-0000-0000-000000000003',
+   '22222222-2222-2222-2222-222222222222',
+   'منتج السقف اتعدى عليه', 'books', 'good', 'pending', 'flagged',
+   'awaiting_review', 'EGP', 'EG', 'cairo'),
+  -- ودي بتاعة منى نفسها — تعارض مصالح
+  ('cccccccc-0000-0000-0000-000000000004',
+   '33333333-3333-3333-3333-333333333333',
+   'منتج المراجعة نفسها', 'sports', 'good', 'pending', 'flagged',
+   'محتوى مشكوك فيه', 'EGP', 'EG', 'cairo');
+
+do $$
+begin
+  perform public.assert_true(
+    public.is_staff('33333333-3333-3333-3333-333333333333'),
+    'منى مراجعة');
+  perform public.assert_true(
+    not public.is_staff('11111111-1111-1111-1111-111111111111'),
+    'وسام مش مراجع');
+
+  -- تصنيف سبب التعليم
+  perform public.assert_eq(public.flag_kind('moderation_unavailable'), 'system',
+    'تعثّر النظام مش حكم على المحتوى');
+  perform public.assert_eq(public.flag_kind('awaiting_review'), 'system',
+    'تعدّي السقف كمان تعثّر نظام');
+  perform public.assert_eq(public.flag_kind('صور مش واضحة'), 'content',
+    'ملاحظة الموديل = محتاج حكم بشري');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- المستخدم العادي: مايشوفش الطابور ولا يقرر
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare
+  blocked boolean := false;
+  res     jsonb;
+  n       int;
+begin
+  begin
+    perform * from public.moderation_queue_page('content', 10);
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'المستخدم العادي مايشوفش الطابور');
+
+  res := public.moderate_decide('cccccccc-0000-0000-0000-000000000001',
+                                'approved');
+  perform public.assert_eq(res->>'error', 'not_authorized',
+    'المستخدم العادي مايقررش');
+
+  -- وحتى منتجه هو مايقدرش يعتمده (الحارس من ملف 19 لسه شغال)
+  update public.items set moderation = 'approved', status = 'available'
+   where id = 'cccccccc-0000-0000-0000-000000000001';
+
+  select count(*)::int into n from public.items
+   where id = 'cccccccc-0000-0000-0000-000000000001' and moderation = 'flagged';
+  perform public.assert_eq(n, 1, 'صاحب المنتج المعلّم مايعتمدش نفسه');
+
+  -- ومايشوفش سجل القرارات
+  select count(*)::int into n from public.moderation_decisions;
+  perform public.assert_eq(n, 0, 'سجل القرارات مخفي عن غير الطاقم');
+
+  -- ولا يعرف مين المراجعين
+  select count(*)::int into n from public.staff;
+  perform public.assert_eq(n, 0, 'قائمة الطاقم مخفية عن المستخدم');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+-- -----------------------------------------------------------------------------
+-- المراجعة
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare
+  res   jsonb;
+  n     int;
+  stats jsonb;
+begin
+  -- الطابور بيتقسم صح
+  select count(*)::int into n
+    from public.moderation_queue_page('content', 50);
+  perform public.assert_eq(n, 2,
+    'طابور المحتوى فيه اللي محتاج حكم بس');
+
+  select count(*)::int into n
+    from public.moderation_queue_page('system', 50);
+  perform public.assert_eq(n, 2,
+    'وطابور أعطال النظام منفصل');
+
+  -- تعارض المصالح
+  res := public.moderate_decide('cccccccc-0000-0000-0000-000000000004',
+                                'approved');
+  perform public.assert_eq(res->>'error', 'own_item',
+    'المراجعة ماتراجعش منتجها');
+
+  -- الرفض من غير سبب
+  res := public.moderate_decide('cccccccc-0000-0000-0000-000000000001',
+                                'rejected');
+  perform public.assert_eq(res->>'error', 'reason_required',
+    'الرفض لازم معاه سبب');
+
+  -- قرار سليم
+  res := public.moderate_decide('cccccccc-0000-0000-0000-000000000001',
+                                'rejected', 'الصور مش للمنتج المعروض');
+  perform public.assert_true((res->>'ok')::boolean, 'القرار اتنفّذ');
+
+  -- واتسجّل باسمها
+  select count(*)::int into n from public.moderation_decisions
+   where item_id = 'cccccccc-0000-0000-0000-000000000001'
+     and moderator_id = '33333333-3333-3333-3333-333333333333'
+     and decision = 'rejected';
+  perform public.assert_eq(n, 1, 'القرار اتسجّل باسم المراجعة');
+
+  -- القرار التاني على نفس المنتج مابيتسجلش
+  res := public.moderate_decide('cccccccc-0000-0000-0000-000000000001',
+                                'approved');
+  perform public.assert_true((res->>'already')::boolean,
+    'المنتج اللي اتحكم عليه مابيتحكمش تاني');
+
+  select count(*)::int into n from public.moderation_decisions
+   where item_id = 'cccccccc-0000-0000-0000-000000000001';
+  perform public.assert_eq(n, 1, 'ومفيش قرار مكرر في السجل');
+
+  -- إعادة محاولة أعطال النظام — دفعة واحدة
+  select public.moderate_requeue_system_flags(50) into n;
+  perform public.assert_eq(n, 2, 'أعطال النظام رجعت للطابور الآلي');
+
+  -- المؤشرات
+  stats := public.moderation_stats();
+  perform public.assert_true((stats->>'ok')::boolean, 'المؤشرات متاحة للمراجعة');
+  perform public.assert_eq((stats->>'pending_system')::int, 0,
+    'مفيش أعطال نظام مستنية');
+  perform public.assert_eq((stats->>'decided_today')::int, 1,
+    'قرار واحد النهاردة');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- الأثر الفعلي — بنتحقق منه بره الدور
+--
+-- RLS بيخفي المنتج المرفوض عن المراجعة نفسها (مش صاحبته ومش معتمد).
+-- وده سلوك صح: اللوحة بتقرا من دالة security definer، مش من الجدول.
+-- -----------------------------------------------------------------------------
+reset role;
+reset request.jwt.claim.sub;
+
+do $$
+declare
+  n int;
+begin
+  select count(*)::int into n from public.items
+   where id = 'cccccccc-0000-0000-0000-000000000001'
+     and moderation = 'rejected' and status = 'rejected';
+  perform public.assert_eq(n, 1, 'المنتج اترفض فعلاً');
+
+  perform public.assert_true(
+    exists (select 1 from public.notifications
+             where user_id = '11111111-1111-1111-1111-111111111111'
+               and title_ar like '%الصور مش للمنتج%'),
+    'صاحب المنتج اتبلّغ بالسبب');
+
+  select count(*)::int into n from public.items
+   where id in ('cccccccc-0000-0000-0000-000000000002',
+                'cccccccc-0000-0000-0000-000000000003')
+     and moderation = 'pending' and moderation_note is null;
+  perform public.assert_eq(n, 2, 'أعطال النظام مابقتش معلّمة');
+end $$;
+
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+-- -----------------------------------------------------------------------------
+-- السجل مُلحَق فقط — حتى للمراجعة
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  blocked boolean := false;
+  n int;
+begin
+  begin
+    update public.moderation_decisions set decision = 'approved';
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'المراجعة ماتقدرش تعدّل سجل قراراتها');
+
+  blocked := false;
+  begin
+    delete from public.moderation_decisions;
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'ولا تمسحه');
+
+  -- ولا ترقّي نفسها لأدمن
+  blocked := false;
+  begin
+    update public.staff set role = 'admin';
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'ولا ترقّي نفسها');
+
+  select count(*)::int into n from public.moderation_decisions;
+  perform public.assert_eq(n, 1, 'السجل زي ما هو');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- وحتى المراجعة ماتقدرش تعتمد منتج من غير الدالة
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  n int;
+begin
+  update public.items
+     set moderation = 'approved', status = 'available'
+   where id = 'cccccccc-0000-0000-0000-000000000004';   -- منتجها هي
+
+  -- منتجها هي، فبتشوفه بـ items_read_own
+  select count(*)::int into n from public.items
+   where id = 'cccccccc-0000-0000-0000-000000000004' and moderation = 'flagged';
+  perform public.assert_eq(n, 1,
+    'الكتابة المباشرة ممنوعة حتى على المراجعة — عشان مايتخطاش السجل');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+
 do $$ begin raise notice E'\n✔ كل الاختبارات نجحت\n'; end $$;

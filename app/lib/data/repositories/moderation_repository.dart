@@ -1,0 +1,277 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/supabase/supabase_init.dart';
+
+/// نوع سبب التعليم.
+///
+/// التقسيم ده مش تفصيلة عرض — ده اللي بيحمي وقت المراجع.
+///
+/// [content] الموديل شاف حاجة وقال «راجعوا ده» → محتاج **حكم بشري**.
+/// [system]  النظام تعثّر (سقف أو موديل مارّدش) → محتاج **إعادة محاولة**.
+///
+/// خلطهم بيهدر أندر مورد عندنا. لو 90% من الطابور أعطال نظام، المراجع
+/// هيقلب على الوضع الآلي وهيعدّي الحالة الحقيقية اللي كانت محتاجاه.
+enum FlagKind { content, system, unknown }
+
+FlagKind _parseFlagKind(String? raw) => switch (raw) {
+      'content' => FlagKind.content,
+      'system' => FlagKind.system,
+      _ => FlagKind.unknown,
+    };
+
+/// صف في طابور المراجعة.
+class QueueEntry {
+  const QueueEntry({
+    required this.itemId,
+    required this.title,
+    required this.description,
+    required this.categoryId,
+    required this.ownerId,
+    required this.ownerName,
+    required this.ownerUsername,
+    required this.ownerTrust,
+    required this.ownerTrades,
+    required this.photoCount,
+    required this.flagKind,
+    required this.flagNote,
+    required this.waitingMinutes,
+    required this.openReports,
+  });
+
+  final String itemId;
+  final String title;
+  final String? description;
+  final String categoryId;
+  final String ownerId;
+  final String ownerName;
+  final String ownerUsername;
+  final String ownerTrust;
+  final int ownerTrades;
+  final int photoCount;
+  final FlagKind flagKind;
+
+  /// سبب التعليم — **بيتعرض للمراجع بس**، مش لصاحب المنتج.
+  final String? flagNote;
+
+  final int waitingMinutes;
+  final int openReports;
+
+  bool get isUrgent => openReports > 0 || waitingMinutes > 60 * 24;
+
+  factory QueueEntry.fromMap(Map<String, dynamic> row) => QueueEntry(
+        itemId: row['item_id'] as String,
+        title: row['title'] as String? ?? '',
+        description: row['description'] as String?,
+        categoryId: row['category_id'] as String? ?? '',
+        ownerId: row['owner_id'] as String? ?? '',
+        ownerName: row['owner_name'] as String? ?? '',
+        ownerUsername: row['owner_username'] as String? ?? '',
+        ownerTrust: row['owner_trust'] as String? ?? 'new',
+        ownerTrades: (row['owner_trades'] as num?)?.toInt() ?? 0,
+        photoCount: (row['photo_count'] as num?)?.toInt() ?? 0,
+        flagKind: _parseFlagKind(row['flag_kind'] as String?),
+        flagNote: row['moderation_note'] as String?,
+        waitingMinutes: (row['waiting_minutes'] as num?)?.toInt() ?? 0,
+        openReports: (row['open_reports'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// مؤشرات الطابور.
+class ModerationStats {
+  const ModerationStats({
+    this.pendingContent = 0,
+    this.pendingSystem = 0,
+    this.pendingUnknown = 0,
+    this.oldestMinutes = 0,
+    this.withReports = 0,
+    this.decidedToday = 0,
+  });
+
+  final int pendingContent;
+  final int pendingSystem;
+  final int pendingUnknown;
+
+  /// أقدم حالة مستنية — **ده المؤشر اللي بيهم**.
+  ///
+  /// المتوسط بيخبّي الحالة اللي نسيناها من أسبوع.
+  final int oldestMinutes;
+
+  final int withReports;
+  final int decidedToday;
+
+  factory ModerationStats.fromMap(Map<String, dynamic> row) => ModerationStats(
+        pendingContent: (row['pending_content'] as num?)?.toInt() ?? 0,
+        pendingSystem: (row['pending_system'] as num?)?.toInt() ?? 0,
+        pendingUnknown: (row['pending_unknown'] as num?)?.toInt() ?? 0,
+        oldestMinutes: (row['oldest_minutes'] as num?)?.toInt() ?? 0,
+        withReports: (row['with_reports'] as num?)?.toInt() ?? 0,
+        decidedToday: (row['decided_today'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// لوحة المراجعة البشرية.
+///
+/// الصلاحية بتتفحص في القاعدة، مش هنا. إخفاء الشاشة في التطبيق تحسين
+/// عرض بس — لو حد وصل للمسار بأي طريقة، القاعدة هي اللي بترفض.
+class ModerationRepository {
+  const ModerationRepository();
+
+  bool get hasBackend => SupabaseInit.isReady;
+  SupabaseClient get _client => SupabaseInit.client;
+
+  /// هل المستخدم الحالي من الطاقم؟
+  Future<bool> amIStaff() async {
+    if (!hasBackend) return true;   // في الوضع التجريبي بنعرض اللوحة
+    try {
+      final result = await _client.rpc('is_staff');
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<QueueEntry>> queue({
+    FlagKind kind = FlagKind.content,
+    int limit = 30,
+  }) async {
+    if (!hasBackend) return _mockQueue(kind);
+
+    try {
+      final rows = await _client.rpc('moderation_queue_page', params: {
+        'p_kind': kind.name,
+        'p_limit': limit,
+      },) as List<dynamic>;
+
+      return rows
+          .map((r) => QueueEntry.fromMap(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<ModerationStats> stats() async {
+    if (!hasBackend) {
+      return const ModerationStats(
+        pendingContent: 3,
+        pendingSystem: 2,
+        oldestMinutes: 190,
+        withReports: 1,
+        decidedToday: 7,
+      );
+    }
+
+    try {
+      final row = await _client.rpc('moderation_stats')
+          as Map<String, dynamic>;
+      if (row['ok'] != true) return const ModerationStats();
+      return ModerationStats.fromMap(row);
+    } catch (_) {
+      return const ModerationStats();
+    }
+  }
+
+  /// القرار.
+  ///
+  /// بترجّع `null` لو نجح، أو مفتاح ترجمة للخطأ.
+  Future<String?> decide({
+    required String itemId,
+    required bool approve,
+    String? reason,
+  }) async {
+    if (!hasBackend) return null;
+
+    try {
+      final row = await _client.rpc('moderate_decide', params: {
+        'p_item': itemId,
+        'p_decision': approve ? 'approved' : 'rejected',
+        'p_reason': reason,
+      },) as Map<String, dynamic>;
+
+      if (row['ok'] == true) return null;
+
+      return switch (row['error']) {
+        'not_authorized' => 'mod.err.notStaff',
+        'own_item' => 'mod.err.ownItem',
+        'reason_required' => 'mod.err.reason',
+        'not_found' => 'common.error',
+        _ => 'common.error',
+      };
+    } catch (_) {
+      return 'common.error';
+    }
+  }
+
+  /// إعادة أعطال النظام للطابور الآلي — دفعة واحدة.
+  ///
+  /// دي **مش قرار**، فمالهاش سجل قرارات. المنتجات دي محدش حكم عليها
+  /// أصلاً — النظام هو اللي تعثّر.
+  Future<int> requeueSystemFlags() async {
+    if (!hasBackend) return 2;
+    try {
+      final n = await _client.rpc('moderate_requeue_system_flags',
+          params: {'p_limit': 100},);
+      return (n as num?)?.toInt() ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  List<QueueEntry> _mockQueue(FlagKind kind) {
+    if (kind == FlagKind.system) {
+      return const [
+        QueueEntry(
+          itemId: 'mock-sys-1',
+          title: 'دراجة هوائية كوبرا',
+          description: 'مستعملة سنة، الفرامل جديدة.',
+          categoryId: 'sports',
+          ownerId: 'u2',
+          ownerName: 'أحمد فتحي',
+          ownerUsername: 'ahmed',
+          ownerTrust: 'trusted',
+          ownerTrades: 12,
+          photoCount: 3,
+          flagKind: FlagKind.system,
+          flagNote: 'moderation_unavailable',
+          waitingMinutes: 45,
+          openReports: 0,
+        ),
+      ];
+    }
+
+    return const [
+      QueueEntry(
+        itemId: 'mock-1',
+        title: 'ساعة سويسرية أصلية',
+        description: 'بالضمان والفاتورة.',
+        categoryId: 'fashion',
+        ownerId: 'u1',
+        ownerName: 'وسام سمير',
+        ownerUsername: 'wessam',
+        ownerTrust: 'new',
+        ownerTrades: 0,
+        photoCount: 2,
+        flagKind: FlagKind.content,
+        flagNote: 'ادعاء أصالة غير مؤكد — الصور مش واضحة',
+        waitingMinutes: 190,
+        openReports: 2,
+      ),
+      QueueEntry(
+        itemId: 'mock-2',
+        title: 'لابتوب ديل للبيع أو البدل',
+        description: 'i7 وذاكرة 16 جيجا.',
+        categoryId: 'computers',
+        ownerId: 'u3',
+        ownerName: 'منى حسن',
+        ownerUsername: 'mona',
+        ownerTrust: 'elite',
+        ownerTrades: 31,
+        photoCount: 4,
+        flagKind: FlagKind.content,
+        flagNote: 'رقم موبايل ظاهر في الوصف',
+        waitingMinutes: 20,
+        openReports: 0,
+      ),
+    ];
+  }
+}
