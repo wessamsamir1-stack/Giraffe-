@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_state.dart';
+import '../../core/push/push_service.dart';
 import '../models/models.dart';
 import 'ai_repository.dart';
 import 'auth_repository.dart';
@@ -9,6 +10,7 @@ import 'items_repository.dart';
 import 'moderation_repository.dart';
 import 'matches_repository.dart';
 import 'notifications_repository.dart';
+import 'push_repository.dart';
 import 'profile_repository.dart';
 import 'storage_repository.dart';
 import 'wishlist_repository.dart';
@@ -32,6 +34,15 @@ final notificationsRepositoryProvider =
 final aiRepositoryProvider = Provider((ref) => const AiRepository());
 final moderationRepositoryProvider =
     Provider((ref) => const ModerationRepository());
+
+/// خدمة الإشعارات الفورية.
+///
+/// الافتراضي **مابيعملش حاجة** — شوف `docs/13-push.md` لتفعيل فايربيز.
+/// الاختبارات بتستبدله بـ FakePushService.
+final pushServiceProvider = Provider<PushService>((ref) => const NoopPushService());
+
+final pushRepositoryProvider =
+    Provider((ref) => PushRepository(ref.watch(pushServiceProvider)));
 
 // =============================================================================
 // البيانات

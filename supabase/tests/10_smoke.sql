@@ -1313,4 +1313,261 @@ reset role;
 reset request.jwt.claim.sub;
 
 
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 20. الإشعارات الفورية'; end $$;
+-- =============================================================================
+do $$
+declare
+  n int;
+begin
+  -- ---------------------------------------------------------------------------
+  -- مش كل إشعار يستاهل رنة
+  -- ---------------------------------------------------------------------------
+  perform public.assert_true(public.push_worthy('match'),
+    'المطابقة تستاهل رنة — دي اللحظة كلها');
+  perform public.assert_true(public.push_worthy('message'),
+    'والرسالة — الطرف التاني مستني رد');
+  perform public.assert_true(public.push_worthy('offer'),
+    'والعرض — وله مهلة');
+  perform public.assert_true(public.push_worthy('meeting'),
+    'واللقاء');
+
+  perform public.assert_true(not public.push_worthy('wishlist'),
+    'تنبيه قائمة الرغبات مفيد بس مش عاجل — يستنى في التطبيق');
+  perform public.assert_true(not public.push_worthy('system'),
+    'ورفض المنتج ماينفعش يوصل كرنة مفاجئة');
+  perform public.assert_true(not public.push_worthy('review'),
+    'والتقييم مش عاجل');
+
+  -- ---------------------------------------------------------------------------
+  -- من غير جهاز مسجّل مفيش صف في الصندوق
+  -- ---------------------------------------------------------------------------
+  perform public.notify_user(
+    '11111111-1111-1111-1111-111111111111', 'match',
+    'مطابقة جديدة', 'New match', '{}'::jsonb);
+
+  select count(*)::int into n from public.push_outbox;
+  perform public.assert_eq(n, 0, 'مفيش صندوق صادر من غير أجهزة مسجّلة');
+end $$;
+
+-- الأجهزة
+insert into public.push_tokens (user_id, token, platform) values
+  ('11111111-1111-1111-1111-111111111111', 'tok-wessam-1', 'android'),
+  ('11111111-1111-1111-1111-111111111111', 'tok-wessam-2', 'ios'),
+  ('22222222-2222-2222-2222-222222222222', 'tok-ahmed-1',  'android');
+
+do $$
+declare
+  n int;
+  j record;
+begin
+  perform public.notify_user(
+    '11111111-1111-1111-1111-111111111111', 'match',
+    'مطابقة جديدة مع أحمد', 'New match with Ahmed',
+    jsonb_build_object('match_id', '00000000-0000-0000-0000-0000000000aa'));
+
+  select count(*)::int into n from public.push_outbox where status = 'queued';
+  perform public.assert_eq(n, 1, 'المطابقة دخلت الصندوق');
+
+  -- تنبيه قائمة الرغبات مابيدخلش
+  perform public.notify_user(
+    '11111111-1111-1111-1111-111111111111', 'wishlist',
+    'منتج من قائمتك', 'From your wishlist', '{}'::jsonb);
+
+  select count(*)::int into n from public.push_outbox;
+  perform public.assert_eq(n, 1, 'وتنبيه الرغبات مادخلش');
+
+  -- ---------------------------------------------------------------------------
+  -- الدمج: 20 رسالة في غرفة = رنة واحدة
+  -- ---------------------------------------------------------------------------
+  for n in 1..20 loop
+    perform public.notify_user(
+      '11111111-1111-1111-1111-111111111111', 'message',
+      'رسالة رقم ' || n, 'Message ' || n,
+      jsonb_build_object('match_id', '00000000-0000-0000-0000-0000000000bb'));
+  end loop;
+
+  select count(*)::int into n from public.push_outbox
+   where kind = 'message' and status = 'queued';
+  perform public.assert_eq(n, 1, '20 رسالة في غرفة واحدة = رنة واحدة');
+
+  -- وبتحمل آخر رسالة مش أولها
+  select * into j from public.push_outbox where kind = 'message';
+  perform public.assert_eq(j.title_ar, 'رسالة رقم 20',
+    'والرنة بتحمل آخر رسالة');
+
+  -- غرفة تانية = رنة منفصلة
+  perform public.notify_user(
+    '11111111-1111-1111-1111-111111111111', 'message',
+    'رسالة في غرفة تانية', 'Other room',
+    jsonb_build_object('match_id', '00000000-0000-0000-0000-0000000000cc'));
+
+  select count(*)::int into n from public.push_outbox where kind = 'message';
+  perform public.assert_eq(n, 2, 'والغرفة التانية رنة لوحدها');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- ساعات الهدوء
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  due     timestamptz;
+  local_h int;
+begin
+  due := public.push_not_before('11111111-1111-1111-1111-111111111111');
+
+  -- مصر UTC+2. بنحسب الساعة المحلية دلوقتي عشان نعرف نتوقع إيه.
+  local_h := extract(hour from now() + interval '2 hours')::int;
+
+  if local_h >= 8 and local_h < 23 then
+    perform public.assert_true(due <= now() + interval '1 second',
+      'في ساعات النهار الرنة بتتبعت فوراً');
+  else
+    perform public.assert_true(due > now(),
+      'وفي ساعات الهدوء بتتأجّل');
+
+    -- بتتأجّل لـ 8 الصبح المحلي
+    perform public.assert_eq(
+      extract(hour from due + interval '2 hours')::int, 8,
+      'التأجيل لـ 8 الصبح بالتوقيت المحلي');
+  end if;
+
+  -- ومهما كان الوقت، مابنلغيش الرنة
+  perform public.assert_true(due < now() + interval '24 hours',
+    'والتأجيل مابيزيدش عن يوم — مابنلغيش الإشعار');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- الإزاحات الزمنية للأسواق
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  perform public.assert_eq(public.country_utc_offset('EG'), 2, 'مصر UTC+2');
+  perform public.assert_eq(public.country_utc_offset('SA'), 3, 'السعودية UTC+3');
+  perform public.assert_eq(public.country_utc_offset('AE'), 4, 'الإمارات UTC+4');
+  perform public.assert_eq(public.country_utc_offset('OM'), 4, 'عُمان UTC+4');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- سحب الدفعة
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  n     int;
+  batch record;
+begin
+  -- بنخلي كل الصفوف مستحقة عشان الاختبار مايعتمدش على ساعة التشغيل
+  update public.push_outbox set not_before = now() - interval '1 minute';
+
+  select count(*)::int into n from public.push_claim_batch(50);
+  perform public.assert_true(n >= 3, 'الدفعة اترجعت (' || n || ')');
+
+  -- الرموز بتيجي مع الصف — عشان العامل مايعملش نداء زيادة لكل صف
+  select * into batch from public.push_claim_batch(1);
+  select count(*)::int into n from public.push_outbox
+   where attempts > 0;
+  perform public.assert_true(n > 0, 'المحاولات بتتعدّ عند السحب');
+
+  -- والسحب بيوقف عند 3 محاولات
+  update public.push_outbox set attempts = 3;
+  select count(*)::int into n from public.push_claim_batch(50);
+  perform public.assert_eq(n, 0, 'اللي فشل 3 مرات مابيتسحبش تاني');
+
+  update public.push_outbox set attempts = 0;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- الرموز الميتة
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  n int;
+begin
+  perform public.push_drop_token('tok-wessam-2');
+
+  select count(*)::int into n from public.push_tokens
+   where token = 'tok-wessam-2';
+  perform public.assert_eq(n, 0, 'الرمز الميت اتمسح');
+
+  select count(*)::int into n from public.push_tokens
+   where user_id = '11111111-1111-1111-1111-111111111111';
+  perform public.assert_eq(n, 1, 'وباقي أجهزة المستخدم زي ما هي');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- تسجيل الجهاز — والرمز بينتقل لصاحبه الجديد
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+
+do $$
+declare
+  n int;
+begin
+  -- أحمد سجّل دخول على جهاز وسام
+  perform public.register_push_token('tok-wessam-1', 'android');
+
+  select count(*)::int into n from public.push_tokens
+   where token = 'tok-wessam-1'
+     and user_id = '22222222-2222-2222-2222-222222222222';
+  perform public.assert_eq(n, 1, 'الرمز انتقل لصاحب الجهاز الجديد');
+
+  select count(*)::int into n from public.push_tokens
+   where token = 'tok-wessam-1'
+     and user_id = '11111111-1111-1111-1111-111111111111';
+  perform public.assert_eq(n, 0,
+    'ومابقاش مربوط بالأول — وإلا إشعاراته كانت هتوصل للتاني');
+
+end $$;
+
+do $$
+declare
+  blocked boolean := false;
+begin
+  -- الصندوق شغل خادم بحت: مفيش صلاحية أصلاً، مش مجرد سياسة صفوف
+  begin
+    perform count(*) from public.push_outbox;
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'صندوق الصادر مقفول على العميل');
+
+  blocked := false;
+  begin
+    perform * from public.push_claim_batch(10);
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'والعميل مايسحبش الدفعة');
+
+  blocked := false;
+  begin
+    perform public.push_drop_token('tok-ahmed-1');
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'ولا يمسح رموز غيره');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+-- -----------------------------------------------------------------------------
+-- التنظيف
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  n int;
+begin
+  update public.push_outbox
+     set status = 'sent', created_at = now() - interval '10 days';
+
+  select public.purge_push_outbox() into n;
+  perform public.assert_true(n > 0, 'الصفوف القديمة اتنضفت (' || n || ')');
+
+  select count(*)::int into n from public.push_outbox;
+  perform public.assert_eq(n, 0, 'والصندوق فضي');
+end $$;
+
+
 do $$ begin raise notice E'\n✔ كل الاختبارات نجحت\n'; end $$;

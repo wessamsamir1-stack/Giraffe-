@@ -37,7 +37,9 @@ begin
       'giraffe-publish-reviews',
       'giraffe-refresh-stats',
       'giraffe-purge-limits',
-      'giraffe-purge-ai-jobs'
+      'giraffe-purge-ai-jobs',
+      'giraffe-push-worker',
+      'giraffe-purge-push'
     );
 
   -- ---------------------------------------------------------------------------
@@ -88,7 +90,38 @@ begin
     'giraffe-purge-ai-jobs', '15 2 * * *',
     $job$ delete from public.ai_jobs where created_at < now() - interval '90 days' $job$);
 
-  raise notice 'الجدولة اتفعّلت — 6 مهام دورية.';
+  -- ---------------------------------------------------------------------------
+  -- العامل بتاع الإشعارات الفورية — كل دقيقة
+  --
+  -- الدقيقة مقبولة: الإشعار المتأخر 60 ثانية لسه مفيد، والأقل من كده
+  -- بيحمّل القاعدة من غير فرق محسوس عند المستخدم.
+  --
+  -- ملاحظة: ده بينادي دالة الحافة عن طريق pg_net. لو الامتداد مش
+  -- متاح، الجدولة دي بتتخطى والإشعارات بتفضل في الصندوق لحد ما
+  -- حاجة تانية تشغّل العامل.
+  -- ---------------------------------------------------------------------------
+  if exists (select 1 from pg_extension where extname = 'pg_net') then
+    perform cron.schedule(
+      'giraffe-push-worker', '* * * * *',
+      $job$
+        select net.http_post(
+          url     := current_setting('app.settings.functions_url', true) || '/send-push',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || current_setting('app.settings.service_key', true)
+          ),
+          body    := '{}'::jsonb
+        )
+      $job$);
+  else
+    raise notice 'pg_net مش متاح — عامل الإشعارات مش مجدول.';
+  end if;
+
+  perform cron.schedule(
+    'giraffe-purge-push', '45 2 * * *',
+    $job$ select public.purge_push_outbox() $job$);
+
+  raise notice 'الجدولة اتفعّلت.';
 end $$;
 
 

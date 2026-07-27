@@ -145,13 +145,26 @@ class SettingsScreen extends ConsumerWidget {
                 label: context.tr('auth.signOut'),
                 danger: true,
                 trailing: const SizedBox.shrink(),
-                onTap: () => context.go(R.auth),
+                onTap: () => _signOut(context, ref),
               ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  /// تسجيل الخروج.
+  ///
+  /// الترتيب مهم: **بنشيل رمز الجهاز الأول**، وبعدين نقفل الجلسة.
+  ///
+  /// لو عكسنا، النداء اللي بيشيل الرمز بيبقى من غير جلسة فبيفشل —
+  /// وإشعارات الحساب القديم بتفضل توصل للجهاز بعد ما صاحبه خرج،
+  /// وممكن يشوفها حد تاني.
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    await ref.read(pushRepositoryProvider).unregisterDevice();
+    await ref.read(authRepositoryProvider).signOut();
+    if (context.mounted) context.go(R.auth);
   }
 
   Future<void> _pickTheme(BuildContext context, WidgetRef ref) async {
