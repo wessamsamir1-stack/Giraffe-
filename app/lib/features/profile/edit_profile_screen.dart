@@ -1,25 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../core/app_state.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  final _name = TextEditingController(text: Mock.me.displayName);
-  final _username = TextEditingController(text: Mock.me.username);
-  final _bio = TextEditingController(text: Mock.me.bio);
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  final _name = TextEditingController();
+  final _username = TextEditingController();
+  final _bio = TextEditingController();
+
+  bool _filled = false;
+  bool _saving = false;
+
+  Future<void> _save() async {
+    final me = ref.read(myProfileProvider).valueOrNull;
+    if (me == null) return;
+
+    setState(() => _saving = true);
+
+    final error = await ref.read(profileRepositoryProvider).upsert(
+          displayName: _name.text,
+          username: _username.text,
+          bio: _bio.text,
+          countryCode: me.countryCode,
+          cityId: me.cityId,
+          areaId: me.areaId,
+          locale: ref.read(localeProvider).languageCode,
+        );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(myProfileProvider);
+    if (mounted) context.pop();
+  }
 
   @override
   void dispose() {
@@ -32,6 +67,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final me = ref.watch(myProfileProvider).valueOrNull;
+
+    if (me == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.tr('profile.edit'))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // تعبئة الحقول مرة واحدة بس — عشان مانمسحش اللي المستخدم بيكتبه
+    if (!_filled) {
+      _filled = true;
+      _name.text = me.displayName;
+      _username.text = me.username;
+      _bio.text = me.bio;
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('profile.edit'))),
@@ -42,8 +93,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: Stack(
               children: [
                 GAvatar(
-                  name: Mock.me.displayName,
-                  seed: Mock.me.avatarSeed,
+                  name: me.displayName,
+                  seed: me.avatarSeed,
                   size: GSize.avatarXl,
                 ),
                 PositionedDirectional(
@@ -99,7 +150,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const SizedBox(height: GSpace.xxl),
           GButton(
             label: context.tr('common.save'),
-            onPressed: () => context.pop(),
+            loading: _saving,
+            onPressed: _save,
           ),
         ],
       ),

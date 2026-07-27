@@ -34,6 +34,24 @@ class ItemsRepository {
     return rows.map(Item.fromMap).toList();
   }
 
+  /// منتجات مستخدم تاني — للملف العام.
+  Future<List<Item>> byOwner(String ownerId) async {
+    if (!hasBackend) {
+      return Mock.marketItems.where((i) => i.ownerId == ownerId).toList();
+    }
+
+    final rows = await _client
+        .from('items')
+        .select(_columns)
+        .eq('owner_id', ownerId)
+        .eq('status', 'available')
+        .eq('moderation', 'approved')
+        .order('published_at', ascending: false)
+        .limit(30);
+
+    return rows.map(Item.fromMap).toList();
+  }
+
   Future<Item?> byId(String itemId) async {
     if (!hasBackend) return Mock.item(itemId);
 

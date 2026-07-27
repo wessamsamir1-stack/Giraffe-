@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
@@ -13,22 +14,59 @@ import '../../widgets/g_common.dart';
 ///
 /// الصفقة ما بتتسجلش مكتملة إلا لما **الاتنين** يمسحوا كود بعض.
 /// ده اللي بيمنع تسجيل صفقات وهمية لرفع مستوى الثقة.
-class CompleteTradeScreen extends StatefulWidget {
+class CompleteTradeScreen extends ConsumerStatefulWidget {
   const CompleteTradeScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
-  State<CompleteTradeScreen> createState() => _CompleteTradeScreenState();
+  ConsumerState<CompleteTradeScreen> createState() =>
+      _CompleteTradeScreenState();
 }
 
-class _CompleteTradeScreenState extends State<CompleteTradeScreen> {
+class _CompleteTradeScreenState extends ConsumerState<CompleteTradeScreen> {
   bool _scanned = false;
+  bool _saving = false;
+
+  /// الكود بيتولّد من رقم الغرفة — النسخة النهائية هتاخده من الخادم
+  /// عشان يبقى لمرة واحدة فعلاً.
+  String get _code => 'GRF-${widget.matchId.substring(0, 8).toUpperCase()}';
+
+  Future<void> _confirm() async {
+    setState(() => _saving = true);
+
+    final error = await ref
+        .read(matchesRepositoryProvider)
+        .confirmTrade(widget.matchId, _code);
+
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _scanned = error == null;
+    });
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(matchProvider(widget.matchId));
+    ref.invalidate(matchesProvider(false));
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final match = Mock.match(widget.matchId);
+    final match = ref.watch(matchProvider(widget.matchId)).valueOrNull;
+
+    if (match == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.tr('complete.title'))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('complete.title'))),
@@ -67,7 +105,8 @@ class _CompleteTradeScreenState extends State<CompleteTradeScreen> {
           GButton(
             label: context.tr('complete.scan'),
             icon: Icons.qr_code_scanner_rounded,
-            onPressed: () => setState(() => _scanned = true),
+            loading: _saving,
+            onPressed: _confirm,
           ),
 
           const SizedBox(height: GSpace.xl),

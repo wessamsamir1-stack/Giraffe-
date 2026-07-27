@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/item_card.dart';
 
@@ -14,16 +16,20 @@ import '../../widgets/item_card.dart';
 /// المستخدم بيكتب جملة عادية زي "عايز لابتوب ألعاب بأقل من 30 ألف"
 /// والنموذج بيحوّلها لفلاتر منظمة يعرضها فوق النتائج **عشان المستخدم
 /// يقدر يعدّلها** — مش صندوق أسود.
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
-  bool _searched = false;
+  String _term = '';
+
+  bool get _searched => _term.isNotEmpty;
+
+  void _run() => setState(() => _term = _controller.text.trim());
 
   static const _recent = ['آيفون 15', 'لابتوب ألعاب', 'عدسة كانون', 'أنتريه'];
 
@@ -59,7 +65,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     controller: _controller,
                     autofocus: true,
                     textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => setState(() => _searched = true),
+                    onSubmitted: (_) => _run(),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: c.textPrimary,
                         ),
@@ -106,7 +112,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 icon: Icons.history_rounded,
                 onTap: () {
                   _controller.text = term;
-                  setState(() => _searched = true);
+                  _run();
                 },
               ),
           ],
@@ -116,7 +122,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _results(BuildContext context, bool ar) {
-    final items = Mock.marketItems;
+    final async = ref.watch(searchResultsProvider(_term));
+    final items = async.valueOrNull ?? const <Item>[];
 
     return Column(
       children: [
@@ -163,6 +170,17 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
         ),
+        if (async.isLoading)
+          const Expanded(child: Center(child: CircularProgressIndicator()))
+        else if (items.isEmpty)
+          Expanded(
+            child: GEmptyState(
+              icon: Icons.search_off_rounded,
+              title: context.tr('market.emptyCategory'),
+              body: context.tr('market.emptyCategoryBody'),
+            ),
+          )
+        else
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.all(GSpace.screenH),

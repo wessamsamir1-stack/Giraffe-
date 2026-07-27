@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_state.dart';
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
@@ -13,14 +15,70 @@ import '../../widgets/g_common.dart';
 ///
 /// مش feature جانبي — دي **مدخل محرك المطابقة**.
 /// كل صفقة بتظهر في الـ deck اتولدت من هنا.
-class WishlistScreen extends StatelessWidget {
+class WishlistScreen extends ConsumerWidget {
   const WishlistScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
+  /// إضافة رغبة من قائمة الأقسام.
+  Future<void> _addWish(BuildContext context, WidgetRef ref) async {
     final ar = context.s.isArabic;
-    final items = Mock.wishlist;
+    final c = context.colors;
+
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: c.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: GRadius.sheet),
+      builder: (ctx) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.8,
+          child: Column(
+            children: [
+              const SizedBox(height: GSpace.lg),
+              Text(
+                context.tr('wish.add'),
+                style: Theme.of(ctx).textTheme.titleLarge,
+              ),
+              const SizedBox(height: GSpace.md),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(GSpace.lg),
+                  children: [
+                    for (final category in Categories.all)
+                      ListTile(
+                        leading: Icon(category.icon, color: c.brand),
+                        title: Text(category.name(ar)),
+                        onTap: () => Navigator.of(ctx).pop(category.id),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (picked == null) return;
+
+    final error = await ref
+        .read(wishlistRepositoryProvider)
+        .add(WishItem(id: '', categoryId: picked));
+
+    if (error != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+    ref.invalidate(myWishlistProvider);
+    ref.invalidate(deckProvider);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ar = context.s.isArabic;
+    final async = ref.watch(myWishlistProvider);
+    final items = async.valueOrNull ?? const <WishItem>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -47,7 +105,7 @@ class WishlistScreen extends StatelessWidget {
               title: context.tr('wish.empty.title'),
               body: context.tr('wish.empty.body'),
               actionLabel: context.tr('wish.add'),
-              onAction: () {},
+              onAction: () => _addWish(context, ref),
             )
           : ListView(
               padding: const EdgeInsets.all(GSpace.screenH),
@@ -68,6 +126,20 @@ class WishlistScreen extends StatelessWidget {
                       subCategoryId: wish.subCategoryId,
                       keyword: wish.keyword,
                       maxValue: wish.maxValue,
+                      notify: wish.notify,
+                      onToggleNotify: () async {
+                        await ref
+                            .read(wishlistRepositoryProvider)
+                            .setNotify(wish.id, !wish.notify);
+                        ref.invalidate(myWishlistProvider);
+                      },
+                      onRemove: () async {
+                        await ref
+                            .read(wishlistRepositoryProvider)
+                            .remove(wish.id);
+                        ref.invalidate(myWishlistProvider);
+                        ref.invalidate(deckProvider);
+                      },
                     ),
                   ),
 
@@ -76,7 +148,9 @@ class WishlistScreen extends StatelessWidget {
                   label: context.tr('wish.add'),
                   icon: Icons.add_rounded,
                   style: GButtonStyle.ghost,
-                  onPressed: items.length >= kMaxWishlistItems ? null : () {},
+                  onPressed: items.length >= kMaxWishlistItems
+                      ? null
+                      : () => _addWish(context, ref),
                 ),
               ],
             ),
@@ -90,12 +164,18 @@ class _WishRow extends StatelessWidget {
     required this.subCategoryId,
     required this.keyword,
     required this.maxValue,
+    required this.notify,
+    required this.onToggleNotify,
+    required this.onRemove,
   });
 
   final String categoryId;
   final String? subCategoryId;
   final String keyword;
   final double? maxValue;
+  final bool notify;
+  final VoidCallback onToggleNotify;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -147,15 +227,17 @@ class _WishRow extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(
-              Icons.notifications_active_outlined,
+              notify
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_off_outlined,
               size: 19,
-              color: c.success,
+              color: notify ? c.success : c.textTertiary,
             ),
-            onPressed: () {},
+            onPressed: onToggleNotify,
           ),
           IconButton(
             icon: Icon(Icons.close_rounded, size: 19, color: c.textTertiary),
-            onPressed: () {},
+            onPressed: onRemove,
           ),
         ],
       ),

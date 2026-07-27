@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
@@ -6,20 +7,21 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/item_card.dart';
 
-class CategoryScreen extends StatefulWidget {
+class CategoryScreen extends ConsumerStatefulWidget {
   const CategoryScreen({super.key, required this.categoryId});
 
   final String categoryId;
 
   @override
-  State<CategoryScreen> createState() => _CategoryScreenState();
+  ConsumerState<CategoryScreen> createState() => _CategoryScreenState();
 }
 
-class _CategoryScreenState extends State<CategoryScreen> {
+class _CategoryScreenState extends ConsumerState<CategoryScreen> {
   String? _sub;
   int _sortIndex = 0;
 
@@ -36,9 +38,13 @@ class _CategoryScreenState extends State<CategoryScreen> {
     final ar = context.s.isArabic;
     final category = Categories.byId(widget.categoryId);
 
-    final items = Mock.marketItems
-        .where((i) => i.categoryId == widget.categoryId)
-        .toList();
+    final async = ref.watch(marketFeedProvider(widget.categoryId));
+    var items = async.valueOrNull ?? const <Item>[];
+
+    // التصفية بالقسم الفرعي محلية — الفلترة على الخادم في المرحلة التانية
+    if (_sub != null) {
+      items = items.where((i) => i.subCategoryId == _sub).toList();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -102,7 +108,21 @@ class _CategoryScreenState extends State<CategoryScreen> {
           ),
 
           Expanded(
-            child: items.isEmpty
+            child: async.isLoading
+                ? GridView.count(
+                    padding: const EdgeInsets.all(GSpace.screenH),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: GSpace.md,
+                    mainAxisSpacing: GSpace.md,
+                    childAspectRatio: 0.66,
+                    children: const [
+                      GSkeleton(radius: GRadius.brLg),
+                      GSkeleton(radius: GRadius.brLg),
+                      GSkeleton(radius: GRadius.brLg),
+                      GSkeleton(radius: GRadius.brLg),
+                    ],
+                  )
+                : items.isEmpty
                 ? GEmptyState(
                     icon: category.icon,
                     tone: GEmptyTone.brand,

@@ -6,6 +6,7 @@ import 'auth_repository.dart';
 import 'deck_repository.dart';
 import 'items_repository.dart';
 import 'matches_repository.dart';
+import 'notifications_repository.dart';
 import 'profile_repository.dart';
 import 'storage_repository.dart';
 import 'wishlist_repository.dart';
@@ -24,6 +25,8 @@ final wishlistRepositoryProvider = Provider((ref) => const WishlistRepository())
 final deckRepositoryProvider = Provider((ref) => const DeckRepository());
 final matchesRepositoryProvider = Provider((ref) => const MatchesRepository());
 final storageRepositoryProvider = Provider((ref) => const StorageRepository());
+final notificationsRepositoryProvider =
+    Provider((ref) => const NotificationsRepository());
 
 // =============================================================================
 // البيانات
@@ -102,6 +105,39 @@ final itemProvider = FutureProvider.family<Item?, String>((ref, itemId) {
 final meetingPlacesProvider = FutureProvider<List<MeetingPlace>>((ref) {
   final city = ref.watch(cityProvider);
   return ref.watch(matchesRepositoryProvider).meetingPlaces(city.id);
+});
+
+/// منتجات مستخدم معيّن.
+final userItemsProvider =
+    FutureProvider.family<List<Item>, String>((ref, userId) {
+  return ref.watch(itemsRepositoryProvider).byOwner(userId);
+});
+
+/// ملف مستخدم باسم المستخدم.
+final publicProfileProvider =
+    FutureProvider.family<UserProfile?, String>((ref, username) {
+  return ref.watch(profileRepositoryProvider).byUsername(username);
+});
+
+/// الإشعارات.
+final notificationsProvider = FutureProvider<List<AppNotification>>((ref) {
+  return ref.watch(notificationsRepositoryProvider).list();
+});
+
+/// عدد الإشعارات غير المقروءة — للشارة على أيقونة الجرس.
+final unreadCountProvider = FutureProvider<int>((ref) {
+  return ref.watch(notificationsRepositoryProvider).unreadCount();
+});
+
+/// نتائج البحث.
+final searchResultsProvider =
+    FutureProvider.family<List<Item>, String>((ref, term) {
+  if (term.trim().isEmpty) return Future.value(const <Item>[]);
+  final city = ref.watch(cityProvider);
+  return ref.watch(itemsRepositoryProvider).search(
+        term,
+        marketGroup: _marketGroupFor(city.id),
+      );
 });
 
 /// تقييمات مستخدم.

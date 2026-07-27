@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
@@ -6,17 +7,32 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 
-class TradeHistoryScreen extends StatelessWidget {
+class TradeHistoryScreen extends ConsumerWidget {
   const TradeHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final history = Mock.matches;
+
+    // السجل = النشط + المؤرشف مع بعض
+    final active = ref.watch(matchesProvider(false)).valueOrNull ?? const [];
+    final archived = ref.watch(matchesProvider(true)).valueOrNull ?? const [];
+    final history = [...active, ...archived];
+
+    if (history.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.tr('profile.history'))),
+        body: GEmptyState(
+          icon: Icons.history_rounded,
+          title: context.tr('matches.empty.title'),
+          body: context.tr('matches.empty.body'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('profile.history'))),

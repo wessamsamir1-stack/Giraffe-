@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
@@ -14,19 +16,20 @@ import '../../widgets/g_text_field.dart';
 /// والمنتج هيطلع مش زي الوصف، وحد هيتأخر وحد ما يجيش.
 ///
 /// من غير المسار ده كل نزاع هيتحول لبلاغ عشوائي وتقييم انتقامي.
-class DisputeScreen extends StatefulWidget {
+class DisputeScreen extends ConsumerStatefulWidget {
   const DisputeScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
-  State<DisputeScreen> createState() => _DisputeScreenState();
+  ConsumerState<DisputeScreen> createState() => _DisputeScreenState();
 }
 
-class _DisputeScreenState extends State<DisputeScreen> {
+class _DisputeScreenState extends ConsumerState<DisputeScreen> {
   final _details = TextEditingController();
   int? _reason;
   bool _sent = false;
+  bool _saving = false;
 
   static const _reasons = [
     'dispute.r1',
@@ -35,6 +38,43 @@ class _DisputeScreenState extends State<DisputeScreen> {
     'dispute.r4',
     'dispute.r5',
   ];
+
+  /// لازم تطابق نوع `dispute_reason` في القاعدة.
+  static const _reasonValues = [
+    'not_as_described',
+    'no_show',
+    'damaged',
+    'scam_attempt',
+    'misconduct',
+  ];
+
+  Future<void> _submit() async {
+    if (_reason == null) return;
+    setState(() => _saving = true);
+
+    final error = await ref.read(matchesRepositoryProvider).openDispute(
+          matchId: widget.matchId,
+          reason: _reasonValues[_reason!],
+          details: _details.text,
+        );
+
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _sent = error == null;
+    });
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    // فتح النزاع بيجمّد الغرفة — لازم نحدّث حالتها
+    ref.invalidate(matchProvider(widget.matchId));
+    ref.invalidate(matchesProvider(false));
+  }
 
   @override
   void dispose() {
@@ -123,7 +163,8 @@ class _DisputeScreenState extends State<DisputeScreen> {
           GButton(
             label: context.tr('dispute.submit'),
             style: GButtonStyle.danger,
-            onPressed: _reason == null ? null : () => setState(() => _sent = true),
+            loading: _saving,
+            onPressed: _reason == null ? null : _submit,
           ),
         ],
       ),

@@ -1,30 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/item_card.dart';
 
-class PublicProfileScreen extends StatelessWidget {
+class PublicProfileScreen extends ConsumerWidget {
   const PublicProfileScreen({super.key, required this.username});
 
   final String username;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final ar = context.s.isArabic;
 
-    final user = Mock.users.firstWhere(
-      (u) => u.username == username,
-      orElse: () => Mock.ahmed,
-    );
-    final items =
-        Mock.marketItems.where((i) => i.ownerId == user.id).toList();
+    final async = ref.watch(publicProfileProvider(username));
+    final user = async.valueOrNull;
+
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text('@$username')),
+        body: async.hasError
+            ? GEmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: context.tr('common.error'),
+                body: context.tr('common.errorBody'),
+                actionLabel: context.tr('common.retry'),
+                onAction: () =>
+                    ref.invalidate(publicProfileProvider(username)),
+              )
+            : const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final items = ref.watch(userItemsProvider(user.id)).valueOrNull ?? const [];
+    final reviews = ref.watch(reviewsProvider(user.id)).valueOrNull ?? const [];
 
     return Scaffold(
       appBar: AppBar(
@@ -32,8 +48,14 @@ class PublicProfileScreen extends StatelessWidget {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (v) {
-              if (v == 'report') context.push(R.report('user', user.id));
+            onSelected: (v) async {
+              if (v == 'report') {
+                context.push(R.report('user', user.id));
+              } else if (v == 'block') {
+                await ref.read(matchesRepositoryProvider).block(user.id);
+                ref.invalidate(matchesProvider(false));
+                if (context.mounted) context.pop();
+              }
             },
             itemBuilder: (ctx) => [
               PopupMenuItem(
@@ -174,7 +196,12 @@ class PublicProfileScreen extends StatelessWidget {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: GSpace.md),
-          for (final review in Mock.reviews.take(2))
+          if (reviews.isEmpty)
+            Text(
+              context.tr('profile.noReviews'),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          for (final review in reviews.take(3))
             Padding(
               padding: const EdgeInsets.only(bottom: GSpace.md),
               child: ReviewCard(

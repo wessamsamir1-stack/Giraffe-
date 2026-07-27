@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
 
-class ReportScreen extends StatefulWidget {
+class ReportScreen extends ConsumerStatefulWidget {
   const ReportScreen({
     super.key,
     required this.targetType,
@@ -19,13 +21,14 @@ class ReportScreen extends StatefulWidget {
   final String targetId;
 
   @override
-  State<ReportScreen> createState() => _ReportScreenState();
+  ConsumerState<ReportScreen> createState() => _ReportScreenState();
 }
 
-class _ReportScreenState extends State<ReportScreen> {
+class _ReportScreenState extends ConsumerState<ReportScreen> {
   final _details = TextEditingController();
   int? _reason;
   bool _sent = false;
+  bool _saving = false;
 
   static const _reasons = [
     'report.r1',
@@ -35,6 +38,40 @@ class _ReportScreenState extends State<ReportScreen> {
     'report.r5',
     'report.r6',
   ];
+
+  /// نفس ترتيب القائمة فوق — لازم يطابق نوع `report_reason` في القاعدة.
+  static const _reasonValues = [
+    'inappropriate',
+    'scam',
+    'prohibited_item',
+    'harassment',
+    'fake_account',
+    'other',
+  ];
+
+  Future<void> _submit() async {
+    if (_reason == null) return;
+    setState(() => _saving = true);
+
+    final error = await ref.read(matchesRepositoryProvider).report(
+          targetType: widget.targetType,
+          targetId: widget.targetId,
+          reason: _reasonValues[_reason!],
+          details: _details.text,
+        );
+
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _sent = error == null;
+    });
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -108,8 +145,8 @@ class _ReportScreenState extends State<ReportScreen> {
           GButton(
             label: context.tr('report.submit'),
             style: GButtonStyle.danger,
-            onPressed:
-                _reason == null ? null : () => setState(() => _sent = true),
+            loading: _saving,
+            onPressed: _reason == null ? null : _submit,
           ),
         ],
       ),

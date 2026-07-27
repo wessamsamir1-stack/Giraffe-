@@ -91,8 +91,9 @@ class ItemStatusChip extends StatelessWidget {
       ItemStatus.available => c.success,
       ItemStatus.reserved => c.warning,
       ItemStatus.negotiating => c.info,
-      ItemStatus.traded => c.textTertiary,
-      ItemStatus.inactive => c.textTertiary,
+      ItemStatus.pending => c.warning,
+      ItemStatus.rejected => c.danger,
+      _ => c.textTertiary,
     };
 
     return GChip(

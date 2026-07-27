@@ -1,32 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final ar = context.s.isArabic;
-    final me = Mock.me;
+    final async = ref.watch(myProfileProvider);
+    final me = async.valueOrNull;
+
+    if (me == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(context.tr('profile.title')),
+          automaticallyImplyLeading: false,
+        ),
+        body: async.hasError
+            ? GEmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: context.tr('common.error'),
+                body: context.tr('common.errorBody'),
+                actionLabel: context.tr('common.retry'),
+                onAction: () => ref.invalidate(myProfileProvider),
+              )
+            : const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(context.tr('profile.title')),
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () => context.push(R.notifications),
+          _BellWithBadge(
+            count: ref.watch(unreadCountProvider).valueOrNull ?? 0,
+            onTap: () => context.push(R.notifications),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -220,6 +239,49 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// جرس الإشعارات بعدّاد غير المقروء.
+class _BellWithBadge extends StatelessWidget {
+  const _BellWithBadge({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.notifications_none_rounded),
+          onPressed: onTap,
+        ),
+        if (count > 0)
+          PositionedDirectional(
+            top: 8,
+            end: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: c.danger,
+                borderRadius: GRadius.brPill,
+                border: Border.all(color: c.background, width: 1.4),
+              ),
+              child: Text(
+                count > 9 ? '9+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

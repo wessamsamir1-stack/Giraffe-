@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_common.dart';
 import 'public_profile_screen.dart';
 
-class ReviewsScreen extends StatelessWidget {
+class ReviewsScreen extends ConsumerWidget {
   const ReviewsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final reviews = Mock.reviews;
-    final me = Mock.me;
+
+    final me = ref.watch(myProfileProvider).valueOrNull;
+    if (me == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.tr('profile.reviews'))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final reviews = ref.watch(reviewsProvider(me.id)).valueOrNull ?? const [];
 
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('profile.reviews'))),

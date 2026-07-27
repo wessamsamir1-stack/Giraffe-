@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
@@ -17,20 +18,20 @@ import 'trade_room_screen.dart';
 ///
 /// الفرق النقدي مسموح ومهم — هو اللي بيقفل معظم الصفقات الواقعية.
 /// بس الفلوس بتتدفع **يد بيد عند اللقاء** — مفيش أي معالجة دفع.
-class CreateOfferScreen extends StatefulWidget {
+class CreateOfferScreen extends ConsumerStatefulWidget {
   const CreateOfferScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
-  State<CreateOfferScreen> createState() => _CreateOfferScreenState();
+  ConsumerState<CreateOfferScreen> createState() => _CreateOfferScreenState();
 }
 
-class _CreateOfferScreenState extends State<CreateOfferScreen> {
+class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   final _cash = TextEditingController();
-  late Item _mine = Mock.match(widget.matchId).myItem;
-  late Item _theirs = Mock.match(widget.matchId).theirItem;
+  Item? _mine;
   bool _iPay = true;
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -43,9 +44,47 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     return _iPay ? value : -value;
   }
 
+  Future<void> _send(Item mine, Item theirs) async {
+    setState(() => _sending = true);
+
+    final error = await ref.read(matchesRepositoryProvider).createOffer(
+          matchId: widget.matchId,
+          giveItemId: mine.id,
+          getItemId: theirs.id,
+          cashDelta: _delta,
+          currencyCode: mine.currencyCode,
+        );
+
+    if (!mounted) return;
+    setState(() => _sending = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(matchProvider(widget.matchId));
+    if (mounted) context.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ar = context.s.isArabic;
+
+    final match = ref.watch(matchProvider(widget.matchId)).valueOrNull;
+    final myItems = ref.watch(myItemsProvider).valueOrNull ?? const <Item>[];
+
+    if (match == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.tr('room.makeOffer'))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final theirs = match.theirItem;
+    final mine = _mine ?? match.myItem;
 
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('room.makeOffer'))),
@@ -57,12 +96,12 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: GSpace.sm),
-          for (final item in Mock.myItems)
+          for (final item in (myItems.isEmpty ? [mine] : myItems))
             Padding(
               padding: const EdgeInsets.only(bottom: GSpace.sm),
               child: _SelectableItem(
                 item: item,
-                selected: _mine.id == item.id,
+                selected: mine.id == item.id,
                 onTap: () => setState(() => _mine = item),
               ),
             ),
@@ -73,7 +112,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: GSpace.sm),
-          _SelectableItem(item: _theirs, selected: true, onTap: () {}),
+          _SelectableItem(item: theirs, selected: true, onTap: () {}),
 
           const SizedBox(height: GSpace.xl),
           Text(
@@ -98,7 +137,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           ),
           const SizedBox(height: GSpace.md),
           GTextField(
-            label: _mine.country.currency.code,
+            label: mine.country.currency.code,
             controller: _cash,
             keyboardType: TextInputType.number,
             prefixIcon: Icons.payments_outlined,
@@ -116,8 +155,8 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
             showActions: false,
             offer: TradeOffer(
               id: 'preview',
-              giveItem: _mine,
-              getItem: _theirs,
+              giveItem: mine,
+              getItem: theirs,
               cashDelta: _delta,
               status: OfferStatus.pending,
               fromMe: true,
@@ -136,7 +175,8 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           const SizedBox(height: GSpace.xl),
           GButton(
             label: context.tr('offer.send'),
-            onPressed: () => context.pop(),
+            loading: _sending,
+            onPressed: () => _send(mine, theirs),
           ),
         ],
       ),

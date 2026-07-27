@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 import '../../widgets/g_text_field.dart';
@@ -13,20 +15,21 @@ import '../../widgets/g_text_field.dart';
 ///
 /// التقييم **محجوب** لحد ما الطرفين يقيّموا أو تعدي 7 أيام —
 /// عشان نمنع التقييم الانتقامي. نفس نظام Airbnb وهو مجرب.
-class RateTradeScreen extends StatefulWidget {
+class RateTradeScreen extends ConsumerStatefulWidget {
   const RateTradeScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
-  State<RateTradeScreen> createState() => _RateTradeScreenState();
+  ConsumerState<RateTradeScreen> createState() => _RateTradeScreenState();
 }
 
-class _RateTradeScreenState extends State<RateTradeScreen> {
+class _RateTradeScreenState extends ConsumerState<RateTradeScreen> {
   final _comment = TextEditingController();
   int _overall = 0;
   int _accuracy = 0;
   int _punctuality = 0;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -34,9 +37,42 @@ class _RateTradeScreenState extends State<RateTradeScreen> {
     super.dispose();
   }
 
+  Future<void> _submit(String revieweeId) async {
+    setState(() => _saving = true);
+
+    final error = await ref.read(matchesRepositoryProvider).submitReview(
+          matchId: widget.matchId,
+          revieweeId: revieweeId,
+          overall: _overall,
+          accuracy: _accuracy == 0 ? null : _accuracy,
+          punctuality: _punctuality == 0 ? null : _punctuality,
+          comment: _comment.text,
+        );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(matchesProvider(false));
+    if (mounted) context.go(R.matches);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final match = Mock.match(widget.matchId);
+    final match = ref.watch(matchProvider(widget.matchId)).valueOrNull;
+
+    if (match == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.tr('rate.title'))),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('rate.title'))),
@@ -98,7 +134,9 @@ class _RateTradeScreenState extends State<RateTradeScreen> {
           const SizedBox(height: GSpace.xxl),
           GButton(
             label: context.tr('rate.submit'),
-            onPressed: _overall == 0 ? null : () => context.go('/matches'),
+            loading: _saving,
+            onPressed:
+                _overall == 0 ? null : () => _submit(match.other.id),
           ),
         ],
       ),

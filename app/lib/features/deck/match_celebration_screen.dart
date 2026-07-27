@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
@@ -6,20 +7,21 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../data/catalog/categories.dart';
-import '../../data/mock/mock_data.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
-class MatchCelebrationScreen extends StatefulWidget {
+class MatchCelebrationScreen extends ConsumerStatefulWidget {
   const MatchCelebrationScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
-  State<MatchCelebrationScreen> createState() => _MatchCelebrationScreenState();
+  ConsumerState<MatchCelebrationScreen> createState() =>
+      _MatchCelebrationScreenState();
 }
 
-class _MatchCelebrationScreenState extends State<MatchCelebrationScreen>
+class _MatchCelebrationScreenState extends ConsumerState<MatchCelebrationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -35,7 +37,16 @@ class _MatchCelebrationScreenState extends State<MatchCelebrationScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final match = Mock.match(widget.matchId);
+    final match = ref.watch(matchProvider(widget.matchId)).valueOrNull;
+
+    if (match == null) {
+      return Scaffold(
+        backgroundColor: c.brand,
+        body: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: c.brand,

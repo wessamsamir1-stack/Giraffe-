@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../data/mock/mock_data.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
 
@@ -19,27 +20,76 @@ import '../../widgets/g_common.dart';
 /// - أماكن عامة معتمدة **فقط** — مش أي مكان
 /// - زر طوارئ ثابت بيبعت الموقع لجهة اتصال محددة مسبقاً
 /// - قائمة تحقق قبل تسليم أي حاجة
-class MeetingScreen extends StatefulWidget {
+class MeetingScreen extends ConsumerStatefulWidget {
   const MeetingScreen({super.key, required this.matchId});
 
   final String matchId;
 
   @override
-  State<MeetingScreen> createState() => _MeetingScreenState();
+  ConsumerState<MeetingScreen> createState() => _MeetingScreenState();
 }
 
-class _MeetingScreenState extends State<MeetingScreen> {
+class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   MeetingPlace? _place;
   DateTime? _date;
   TimeOfDay? _time;
   final Set<int> _checked = {};
+  bool _saving = false;
 
   bool get _ready => _place != null && _date != null && _time != null;
+
+  Future<void> _confirm() async {
+    if (!_ready) return;
+    setState(() => _saving = true);
+
+    final at = DateTime(
+      _date!.year,
+      _date!.month,
+      _date!.day,
+      _time!.hour,
+      _time!.minute,
+    );
+
+    final error = await ref.read(matchesRepositoryProvider).scheduleMeeting(
+          matchId: widget.matchId,
+          placeId: _place!.id,
+          at: at,
+        );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr(error))),
+      );
+      return;
+    }
+
+    ref.invalidate(matchProvider(widget.matchId));
+    if (mounted) context.pushReplacement(R.complete(widget.matchId));
+  }
+
+  Future<void> _sendSos() async {
+    final me = ref.read(profileRepositoryProvider);
+    final hasContact = await me.hasEmergencyContact();
+    if (!mounted) return;
+
+    // من غير جهة اتصال الزر مالوش معنى — بنوديه يحددها الأول
+    if (!hasContact) {
+      context.push(R.settingsEmergency);
+      return;
+    }
+    if (mounted) _confirmSos(context);
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final ar = context.s.isArabic;
+
+    final places =
+        ref.watch(meetingPlacesProvider).valueOrNull ?? const <MeetingPlace>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -49,7 +99,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
           Padding(
             padding: const EdgeInsetsDirectional.only(end: GSpace.sm),
             child: GestureDetector(
-              onTap: () => _confirmSos(context),
+              onTap: _sendSos,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: GSpace.md,
@@ -98,7 +148,13 @@ class _MeetingScreenState extends State<MeetingScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: GSpace.md),
-          for (final place in Mock.meetingPlaces)
+          if (places.isEmpty)
+            GNotice(
+              tone: GNoticeTone.warning,
+              icon: Icons.place_outlined,
+              text: context.tr('meet.placeHint'),
+            ),
+          for (final place in places)
             Padding(
               padding: const EdgeInsets.only(bottom: GSpace.sm),
               child: _PlaceRow(
@@ -166,9 +222,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
           const SizedBox(height: GSpace.xl),
           GButton(
             label: context.tr('common.confirm'),
-            onPressed: _ready
-                ? () => context.pushReplacement(R.complete(widget.matchId))
-                : null,
+            loading: _saving,
+            onPressed: _ready ? _confirm : null,
           ),
           const SizedBox(height: GSpace.md),
           GButton(
