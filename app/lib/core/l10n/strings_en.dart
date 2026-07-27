@@ -493,4 +493,15 @@ const Map<String, String> kEn = {
   'mod.err.notStaff': 'Staff only',
   'mod.err.ownItem': 'You cannot review your own item',
   'mod.err.reason': 'Write the reason first',
+
+  // Scanning the trade code
+  'scan.title': 'Scan their code',
+  'scan.open': 'Scan with camera',
+  'scan.hint': 'Point the camera at the code on their screen',
+  'scan.typeInstead': 'Type the code instead',
+  'scan.err.wrongRoom': 'That code is for a different trade',
+  'scan.err.notOurs': 'That is not a Giraffe code',
+  'scan.err.needsUpdate': 'This code needs a newer version of the app',
+  'scan.err.camera': 'Cannot open the camera. Permission may be denied.',
+  'complete.confirm': 'Confirm trade',
 };

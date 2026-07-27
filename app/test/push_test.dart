@@ -29,7 +29,7 @@ void main() {
     });
 
     test('التسجيل بيقف عندها من غير ما يرمي', () async {
-      final repo = PushRepository(service);
+      const repo = PushRepository(service);
       expect(await repo.registerDevice(), isNull);
     });
   });

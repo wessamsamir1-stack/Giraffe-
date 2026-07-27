@@ -23,6 +23,8 @@ dependencies:
 
   # اختيار الصور من الكاميرا والمعرض
   image_picker: ^1.1.2
+  mobile_scanner: ^6.0.11
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
@@ -10,6 +11,8 @@ import '../../core/theme/app_dimens.dart';
 import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
 import '../../widgets/g_common.dart';
+import 'qr_scan_sheet.dart';
+import 'trade_code.dart';
 
 /// إتمام الصفقة بتأكيد الطرفين.
 ///
@@ -100,6 +103,27 @@ class _CompleteTradeScreenState extends ConsumerState<CompleteTradeScreen> {
     ref.invalidate(matchesProvider(false));
   }
 
+  /// فتح الماسح.
+  ///
+  /// بيرجّع الكود لو المسح نجح، والتأكيد بيتم بنفس المسار المكتوب —
+  /// يعني الماسح بيملا الخانة بس، مش بيعمل مسار تاني موازي.
+  ///
+  /// الميزة إن التحقق والأخطاء وسقف المحاولات كلهم في مكان واحد.
+  Future<void> _scan() async {
+    final code = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: GRadius.sheet),
+      builder: (_) => QrScanSheet(matchId: widget.matchId),
+    );
+
+    if (code == null || !mounted) return;
+
+    _entered.text = code;
+    await _confirm();
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -153,7 +177,28 @@ class _CompleteTradeScreenState extends ConsumerState<CompleteTradeScreen> {
                           height: 168,
                           child: Center(child: CircularProgressIndicator()),
                         )
-                      : _QrPlaceholder(size: 168, seed: _myCode ?? ''),
+                      : QrImageView(
+                          // كود QR حقيقي — الرسم القديم كان تزييني،
+                          // يعني الماسح ماكانش هيقراه أصلاً.
+                          data: encodeTradeCode(
+                            matchId: widget.matchId,
+                            code: _myCode ?? '',
+                          ),
+                          version: QrVersions.auto,
+                          size: 168,
+                          // تصحيح خطأ متوسط: الشاشة بتتمسح من زاوية
+                          // وفيها انعكاس، فالكود محتاج يتحمل تشويش.
+                          errorCorrectionLevel: QrErrorCorrectLevel.M,
+                          backgroundColor: Colors.white,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
+                            color: Color(0xFF121212),
+                          ),
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.square,
+                            color: Color(0xFF121212),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: GSpace.md),
 
@@ -200,10 +245,17 @@ class _CompleteTradeScreenState extends ConsumerState<CompleteTradeScreen> {
                 border: OutlineInputBorder(borderRadius: GRadius.brLg),
               ),
             ),
-            const SizedBox(height: GSpace.lg),
+            const SizedBox(height: GSpace.md),
             GButton(
-              label: context.tr('complete.scan'),
+              label: context.tr('scan.open'),
               icon: Icons.qr_code_scanner_rounded,
+              style: GButtonStyle.secondary,
+              onPressed: _saving ? null : _scan,
+            ),
+            const SizedBox(height: GSpace.md),
+            GButton(
+              label: context.tr('complete.confirm'),
+              icon: Icons.check_rounded,
               loading: _saving,
               onPressed: _confirm,
             ),
@@ -254,58 +306,3 @@ class _UpperCaseFormatter extends TextInputFormatter {
   }
 }
 
-/// رسم مبدئي لكود QR — بيتستبدل بمكتبة توليد حقيقية عند الربط.
-///
-/// النمط مشتق من الكود نفسه، فكودين مختلفين بيرسموا شكلين مختلفين.
-class _QrPlaceholder extends StatelessWidget {
-  const _QrPlaceholder({required this.size, required this.seed});
-
-  final double size;
-  final String seed;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size.square(size),
-      painter: _QrPainter(seed),
-    );
-  }
-}
-
-class _QrPainter extends CustomPainter {
-  _QrPainter(this.seed);
-
-  final String seed;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const modules = 21;
-    final cell = size.width / modules;
-    final paint = Paint()..color = const Color(0xFF121212);
-
-    var hash = 7;
-    for (var i = 0; i < seed.length; i++) {
-      hash = (hash * 31 + seed.codeUnitAt(i)) & 0xFFFFFF;
-    }
-
-    for (var y = 0; y < modules; y++) {
-      for (var x = 0; x < modules; x++) {
-        final inFinder = (x < 7 && y < 7) ||
-            (x >= modules - 7 && y < 7) ||
-            (x < 7 && y >= modules - 7);
-        final on = inFinder
-            ? (x % 6 == 0 || y % 6 == 0 || (x > 1 && x < 5 && y > 1 && y < 5))
-            : ((x * 7 + y * 13 + x * y + hash) % 3 == 0);
-        if (on) {
-          canvas.drawRect(
-            Rect.fromLTWH(x * cell, y * cell, cell * 0.92, cell * 0.92),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_QrPainter oldDelegate) => oldDelegate.seed != seed;
-}

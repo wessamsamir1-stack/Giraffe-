@@ -494,4 +494,15 @@ const Map<String, String> kAr = {
   'mod.err.notStaff': 'الصفحة دي للطاقم بس',
   'mod.err.ownItem': 'مينفعش تراجع منتجك',
   'mod.err.reason': 'اكتب سبب الرفض الأول',
+
+  // مسح كود الإتمام
+  'scan.title': 'امسح كود الطرف التاني',
+  'scan.open': 'امسح بالكاميرا',
+  'scan.hint': 'وجّه الكاميرا على الكود اللي على شاشته',
+  'scan.typeInstead': 'أكتب الكود بدل المسح',
+  'scan.err.wrongRoom': 'ده كود صفقة تانية — اتأكدوا إنكم في نفس الغرفة',
+  'scan.err.notOurs': 'ده مش كود Giraffe',
+  'scan.err.needsUpdate': 'الكود ده محتاج نسخة أحدث من التطبيق',
+  'scan.err.camera': 'مش قادرين نفتح الكاميرا. ممكن الصلاحية مرفوضة.',
+  'complete.confirm': 'أكّد الإتمام',
 };
