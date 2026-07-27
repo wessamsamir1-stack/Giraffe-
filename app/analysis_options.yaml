@@ -1,0 +1,21 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # النصوص العربية في الكود مؤقتة لحد ما تتنقل كلها لملفات الترجمة
+    avoid_print: warning
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_empty_else
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_final_locals
+    - require_trailing_commas
+    - sort_child_properties_last
+    - unnecessary_await_in_return
+    - use_super_parameters

@@ -1,0 +1,68 @@
+name: giraffe
+description: "Giraffe — Swipe. Match. Trade. شبكة مقايضة اجتماعية"
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Routing
+  go_router: ^14.2.7
+
+  # Backend
+  supabase_flutter: ^2.15.4
+
+  # اختيار الصور من الكاميرا والمعرض
+  image_picker: ^1.1.2
+  mobile_scanner: ^6.0.11
+  qr_flutter: ^4.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # ---------------------------------------------------------------------------
+  # الخطوط — Fonts
+  #
+  # المشروع بيشتغل من غير ملفات خطوط وبيستخدم خط النظام كبديل.
+  #
+  # عشان الشكل النهائي، حمّل الخطوط دي وحطها في المسارات التالية
+  # ثم شيل علامة التعليق عن القسم ده:
+  #
+  #   Inter                 →  https://fonts.google.com/specimen/Inter
+  #   IBM Plex Sans Arabic  →  https://fonts.google.com/specimen/IBM+Plex+Sans+Arabic
+  #
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: IBMPlexSansArabic
+  #     fonts:
+  #       - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/IBMPlexSansArabic-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+  #         weight: 700

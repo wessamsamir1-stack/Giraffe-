@@ -1,0 +1,127 @@
+# =============================================================================
+# Giraffe — الفحص الآلي
+#
+# عندنا 208 تأكيد على القاعدة و83 اختبار على التطبيق، وكانوا مابيشتغلوش
+# إلا لما حد يشغّلهم بإيده. يعني أي دفعة ممكن تكسر حاجة ومحدش ياخد باله
+# إلا بعد النشر.
+#
+# الوظيفتان مستقلتان وبيشتغلوا بالتوازي: التطبيق مالوش علاقة بالقاعدة
+# في الفحص، فمفيش داعي واحدة تستنى التانية.
+# =============================================================================
+name: CI
+
+on:
+  # الدفع على الفرع الأساسي بس. لو حطينا كل الفروع، أي فرع عليه PR
+  # بيتفحص مرتين — مرة من الدفع ومرة من الـ PR — وده ضِعف الوقت
+  # مقابل صفر معلومة زيادة.
+  push:
+    branches: [main]
+  pull_request:
+
+# دفعة جديدة على نفس الفرع بتلغي اللي قبلها — مفيش فايدة من فحص
+# كوميت اتخطى بالفعل.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # التطبيق
+  # ---------------------------------------------------------------------------
+  app:
+    name: التطبيق — تحليل واختبار
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # مثبّتة عن قصد. النسخة اللي الكود اتصرّف واتختبر عليها —
+          # وتحديثها لازم يبقى تغيير مقصود مش مفاجأة في فحص عابر.
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - name: تنزيل الاعتماديات
+        run: flutter pub get
+
+      # flutter analyze بيفشل على أي ملاحظة كمان مش الأخطاء بس،
+      # والمشروع نضيف بالكامل — فأي ملاحظة جديدة معناها تراجع.
+      - name: تحليل
+        run: flutter analyze
+
+      - name: اختبارات
+        run: flutter test --reporter expanded
+
+  # ---------------------------------------------------------------------------
+  # قاعدة البيانات
+  # ---------------------------------------------------------------------------
+  database:
+    name: القاعدة — تصريف واختبار
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # 16 هي اللي السكيما اتختبرت عليها محلياً
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تركيب عميل psql
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # السكريبت بياخد بيانات الاتصال من البيئة، فبيشتغل على حاوية
+      # الخدمة زي ما بيشتغل محلياً من غير أي تعديل.
+      - name: تصريف المهاجرات وتشغيل الاختبارات
+        run: ./supabase/tests/run_local.sh
+
+  # ---------------------------------------------------------------------------
+  # تطبيق الأقسام مطابق للقاعدة
+  #
+  # كتالوج الأقسام مكتوب في الدارت، وبذور القاعدة بتتولّد منه. لو
+  # الاتنين اختلفوا، المنتج بيتربط بقسم مش موجود — والعطل ده بيظهر
+  # بعد النشر مش قبله.
+  # ---------------------------------------------------------------------------
+  catalog:
+    name: الكتالوج — التطبيق والقاعدة متطابقين
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: توليد البذور والمقارنة
+        env:
+          SEED: supabase/migrations/20260727001500_seed_catalog.sql
+        run: |
+          python3 supabase/tools/gen_catalog_seed.py > /tmp/generated.sql
+          if ! diff -u "$SEED" /tmp/generated.sql; then
+            echo "::error::كتالوج الدارت والبذور في القاعدة مش متطابقين."
+            echo "شغّل: python3 supabase/tools/gen_catalog_seed.py > $SEED"
+            exit 1
+          fi
