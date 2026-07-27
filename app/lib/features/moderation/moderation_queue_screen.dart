@@ -155,6 +155,19 @@ class _ModerationQueueScreenState extends ConsumerState<ModerationQueueScreen> {
               },
             ),
 
+            const SizedBox(height: GSpace.xl),
+
+            // البلاغات على المستخدمين والرسايل — طابور منفصل
+            GButton(
+              label: context.tr('reports.title'),
+              icon: Icons.flag_outlined,
+              style: GButtonStyle.ghost,
+              onPressed: () => context.push(R.modReports),
+            ),
+
+            const SizedBox(height: GSpace.md),
+            const _AccuracyPanel(),
+
             const SizedBox(height: GSpace.xxl),
             Text(
               context.tr('mod.footer'),
@@ -321,6 +334,104 @@ class _QueueCard extends StatelessWidget {
                       color: entry.isUrgent ? c.danger : null,
                     ),
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// تقرير دقة الفحص.
+///
+/// الرقم اللي بيهم هو **معدل التعليم الخاطئ**: من كل المنتجات اللي
+/// الموديل علّمها، كام واحد المراجع وافق عليه.
+///
+/// عالي = الموديل بيهدر انتباه المراجع على منتجات سليمة.
+/// صفر = غالباً متساهل زيادة ومابيعلّمش حاجات المفروض يعلّمها.
+///
+/// **مفيش رقم صح مطلق.** الاتجاه هو اللي بيقول نشدّ ولا نرخي، عشان
+/// كده بنعرض الرقم من غير حكم عليه.
+class _AccuracyPanel extends ConsumerWidget {
+  const _AccuracyPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final report = ref.watch(accuracyReportProvider).valueOrNull;
+
+    if (report == null || report.decisions == 0) return const SizedBox.shrink();
+
+    final rate = report.falseFlagRate;
+
+    return GSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.tr('acc.title'),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: GSpace.sm),
+
+          if (rate != null) ...[
+            Text(
+              '${(rate * 100).round()}٪',
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            Text(
+              context.tr('acc.falseFlag'),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: c.textSecondary),
+            ),
+            const SizedBox(height: GSpace.sm),
+            Text(
+              context.tr('acc.falseFlagHint'),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: c.textTertiary),
+            ),
+          ],
+
+          const SizedBox(height: GSpace.md),
+          Wrap(
+            spacing: GSpace.sm,
+            runSpacing: GSpace.sm,
+            children: [
+              GChip(
+                label: context.trf('acc.decisions', {'n': report.decisions}),
+                dense: true,
+              ),
+              if (report.medianWaitMinutes != null)
+                GChip(
+                  label: context.trf('acc.median', {
+                    'n': report.medianWaitMinutes!.round(),
+                  }),
+                  icon: Icons.schedule_rounded,
+                  dense: true,
+                ),
+              if (report.p90WaitMinutes != null)
+                GChip(
+                  label: context.trf('acc.p90', {
+                    'n': report.p90WaitMinutes!.round(),
+                  }),
+                  icon: Icons.trending_up_rounded,
+                  dense: true,
+                ),
+              if (report.reportsHandled > 0)
+                GChip(
+                  label: context.trf('acc.reports', {
+                    'n': report.reportsHandled,
+                  }),
+                  icon: Icons.flag_outlined,
+                  dense: true,
+                ),
             ],
           ),
         ],

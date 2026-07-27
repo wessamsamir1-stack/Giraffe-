@@ -285,4 +285,204 @@ class ModerationRepository {
       ),
     ];
   }
+
+  // ---------------------------------------------------------------------------
+  // البلاغات
+  // ---------------------------------------------------------------------------
+
+  Future<List<ReportEntry>> reports({int limit = 30}) async {
+    if (!hasBackend) return _mockReports();
+
+    try {
+      final rows = await _client
+          .rpc('report_queue_page', params: {'p_limit': limit}) as List<dynamic>;
+      return rows
+          .map((r) => ReportEntry.fromMap(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// القرار على بلاغ.
+  ///
+  /// `days` بـ `null` معناه إيقاف دائم — وده للأدمن بس، والقاعدة
+  /// هي اللي بتفرض ده.
+  Future<String?> decideReport({
+    required String reportId,
+    required ReportAction action,
+    String? reason,
+    int? days = 7,
+  }) async {
+    if (!hasBackend) return null;
+
+    try {
+      final row = await _client.rpc('report_decide', params: {
+        'p_report': reportId,
+        'p_action': action.name,
+        'p_reason': reason,
+        'p_days': days,
+      },) as Map<String, dynamic>;
+
+      if (row['ok'] == true) return null;
+
+      return switch (row['error']) {
+        'not_authorized' => 'mod.err.notStaff',
+        'own_report' => 'mod.err.ownReport',
+        'reason_required' => 'mod.err.reason',
+        'admin_required' => 'mod.err.adminOnly',
+        _ => 'common.error',
+      };
+    } catch (_) {
+      return 'common.error';
+    }
+  }
+
+  /// تقرير دقة الفحص.
+  Future<AccuracyReport?> accuracyReport({int days = 30}) async {
+    if (!hasBackend) {
+      return const AccuracyReport(
+        decisions: 40, approved: 14, rejected: 26,
+        falseFlagRate: 0.35, medianWaitMinutes: 42, p90WaitMinutes: 310,
+        reportsHandled: 9,
+      );
+    }
+
+    try {
+      final row = await _client
+          .rpc('moderation_report', params: {'p_days': days})
+              as Map<String, dynamic>;
+      if (row['ok'] != true) return null;
+      return AccuracyReport.fromMap(row);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<ReportEntry> _mockReports() => const [
+        ReportEntry(
+          reportId: 'r1',
+          targetType: 'user',
+          targetId: 'u2',
+          reason: 'scam',
+          details: 'طلب مني تحويل قبل اللقاء',
+          reporterName: 'وسام سمير',
+          reportsOnTarget: 3,
+          waitingMinutes: 95,
+          targetLabel: 'أحمد فتحي',
+          targetBody: null,
+        ),
+        ReportEntry(
+          reportId: 'r2',
+          targetType: 'message',
+          targetId: 'm9',
+          reason: 'inappropriate',
+          details: 'بيحاول ياخد المعاملة بره التطبيق',
+          reporterName: 'منى حسن',
+          reportsOnTarget: 1,
+          waitingMinutes: 20,
+          targetLabel: 'رسالة',
+          targetBody: 'كلّمني على الرقم ده بره التطبيق',
+        ),
+      ];
+}
+
+/// الإجراء على بلاغ، مرتّب بالشدّة.
+enum ReportAction { dismissed, warned, removed, banned }
+
+/// صف في طابور البلاغات.
+class ReportEntry {
+  const ReportEntry({
+    required this.reportId,
+    required this.targetType,
+    required this.targetId,
+    required this.reason,
+    required this.details,
+    required this.reporterName,
+    required this.reportsOnTarget,
+    required this.waitingMinutes,
+    required this.targetLabel,
+    required this.targetBody,
+  });
+
+  final String reportId;
+  final String targetType;
+  final String targetId;
+  final String reason;
+  final String? details;
+  final String reporterName;
+
+  /// كام بلاغ مفتوح على نفس الهدف.
+  ///
+  /// أقوى إشارة عندنا: خمس ناس مختلفين بلّغوا على نفس الشخص مش صدفة.
+  final int reportsOnTarget;
+
+  final int waitingMinutes;
+
+  /// اسم المستخدم المبلَّغ عنه، أو «رسالة».
+  final String targetLabel;
+
+  /// نص الرسالة المبلَّغ عنها — المراجع مايقدرش يحكم من غيره.
+  final String? targetBody;
+
+  bool get isMessage => targetType == 'message';
+
+  factory ReportEntry.fromMap(Map<String, dynamic> row) {
+    final target = (row['target'] as Map<String, dynamic>?) ?? const {};
+    final type = row['target_type'] as String? ?? 'user';
+
+    return ReportEntry(
+      reportId: row['report_id'] as String,
+      targetType: type,
+      targetId: row['target_id'] as String? ?? '',
+      reason: row['reason'] as String? ?? 'other',
+      details: row['details'] as String?,
+      reporterName: row['reporter_name'] as String? ?? '',
+      reportsOnTarget: (row['reports_on_target'] as num?)?.toInt() ?? 1,
+      waitingMinutes: (row['waiting_minutes'] as num?)?.toInt() ?? 0,
+      targetLabel: type == 'user'
+          ? (target['display_name'] as String? ?? '')
+          : 'رسالة',
+      targetBody: target['body'] as String?,
+    );
+  }
+}
+
+/// تقرير دقة الفحص.
+class AccuracyReport {
+  const AccuracyReport({
+    required this.decisions,
+    required this.approved,
+    required this.rejected,
+    required this.falseFlagRate,
+    required this.medianWaitMinutes,
+    required this.p90WaitMinutes,
+    required this.reportsHandled,
+  });
+
+  final int decisions;
+  final int approved;
+  final int rejected;
+
+  /// من كل المنتجات اللي الموديل علّمها، كام واحد المراجع وافق عليه.
+  ///
+  /// عالي = الموديل بيهدر انتباه المراجع على منتجات سليمة.
+  /// صفر = غالباً متساهل زيادة ومابيعلّمش حاجات المفروض يعلّمها.
+  ///
+  /// **مفيش رقم صح مطلق** — الاتجاه هو اللي بيقول نشدّ ولا نرخي.
+  final double? falseFlagRate;
+
+  final double? medianWaitMinutes;
+  final double? p90WaitMinutes;
+  final int reportsHandled;
+
+  factory AccuracyReport.fromMap(Map<String, dynamic> row) => AccuracyReport(
+        decisions: (row['decisions'] as num?)?.toInt() ?? 0,
+        approved: (row['approved'] as num?)?.toInt() ?? 0,
+        rejected: (row['rejected'] as num?)?.toInt() ?? 0,
+        falseFlagRate: (row['false_flag_rate'] as num?)?.toDouble(),
+        medianWaitMinutes: (row['median_wait_minutes'] as num?)?.toDouble(),
+        p90WaitMinutes: (row['p90_wait_minutes'] as num?)?.toDouble(),
+        reportsHandled: (row['reports_handled'] as num?)?.toInt() ?? 0,
+      );
 }

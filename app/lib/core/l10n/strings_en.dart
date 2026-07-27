@@ -507,4 +507,32 @@ const Map<String, String> kEn = {
 
   // Review photos
   'mod.photosUnavailable': 'Photos unavailable — judge with caution or defer',
+
+  // Reports and accuracy
+  'report.reason.inappropriate': 'Inappropriate content',
+  'report.reason.scam': 'Scam attempt',
+  'report.reason.prohibited_item': 'Prohibited item',
+  'report.reason.harassment': 'Harassment',
+  'report.reason.fake_account': 'Fake account',
+  'report.reason.other': 'Other',
+  'reports.title': 'User reports',
+  'reports.empty': 'No open reports',
+  'reports.emptyBody': 'Everything has been handled.',
+  'reports.footer': 'Item reports are handled with the item in the review queue.',
+  'reports.count': '{n} reports',
+  'reports.said': '{name}: {text}',
+  'reports.reasonHint': 'The reason is recorded, and sent to the user if there is a penalty.',
+  'reports.action.dismissed': 'Not a valid report',
+  'reports.action.warned': 'Warn the user',
+  'reports.action.removed': 'Hide the message',
+  'reports.action.banned': 'Suspend account',
+  'mod.err.ownReport': 'You cannot decide a report you are part of',
+  'mod.err.adminOnly': 'Permanent suspension is admin-only',
+  'acc.title': 'Automated screening accuracy — last 30 days',
+  'acc.falseFlag': 'of flagged items were approved',
+  'acc.falseFlagHint': 'A high number means screening is wasting your time on clean items. Zero often means it is too lenient.',
+  'acc.decisions': '{n} decisions',
+  'acc.median': 'median {n} min',
+  'acc.p90': 'worst {n} min',
+  'acc.reports': '{n} reports',
 };

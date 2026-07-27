@@ -18,6 +18,7 @@ import '../../features/market/category_screen.dart';
 import '../../features/market/market_screen.dart';
 import '../../features/moderation/moderation_queue_screen.dart';
 import '../../features/moderation/moderation_review_screen.dart';
+import '../../features/moderation/reports_queue_screen.dart';
 import '../../features/market/search_screen.dart';
 import '../../features/matches/complete_trade_screen.dart';
 import '../../features/matches/create_offer_screen.dart';
@@ -110,6 +111,7 @@ class R {
   // المراجعة البشرية — للطاقم بس، والقاعدة هي اللي بتفرض ده
   static const modQueue = '/moderation';
   static String modReview(String itemId) => '/moderation/$itemId';
+  static const modReports = '/moderation/reports';
 
   // عرضية
   static const notifications = '/notifications';
@@ -291,6 +293,8 @@ GoRouter buildRouter() {
 
       // --------------------------------------------------- المراجعة البشرية
       GoRoute(path: R.modQueue, builder: (_, __) => const ModerationQueueScreen()),
+      // قبل مسار المنتج عشان 'reports' ماتتقراش كرقم منتج
+      GoRoute(path: R.modReports, builder: (_, __) => const ReportsQueueScreen()),
       GoRoute(
         path: '/moderation/:itemId',
         builder: (context, state) => ModerationReviewScreen(

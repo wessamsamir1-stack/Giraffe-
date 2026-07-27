@@ -1767,4 +1767,219 @@ reset role;
 reset request.jwt.claim.sub;
 
 
+-- =============================================================================
+do $$ begin raise notice E'\n▶ 22. طابور البلاغات وتقرير الدقة'; end $$;
+-- =============================================================================
+
+-- بلاغ على مستخدم من اتنين مختلفين، وبلاغ على رسالة
+do $$
+declare
+  v_match uuid;
+  v_msg   uuid;
+begin
+  select id into v_match from public.matches
+   where stage = 'completed' limit 1;
+
+  insert into public.messages (id, match_id, sender_id, kind, body)
+  values (gen_random_uuid(), v_match,
+          '22222222-2222-2222-2222-222222222222', 'text',
+          'كلّمني على الرقم ده بره التطبيق')
+  returning id into v_msg;
+
+  create temp table t_msg as select v_msg as id;
+
+  insert into public.reports (reporter_id, target_type, target_id, reason, details)
+  values
+    ('11111111-1111-1111-1111-111111111111', 'user',
+     '22222222-2222-2222-2222-222222222222', 'scam', 'طلب مني تحويل قبل اللقاء'),
+    ('33333333-3333-3333-3333-333333333333', 'user',
+     '22222222-2222-2222-2222-222222222222', 'scam', 'نفس الأسلوب معايا'),
+    ('11111111-1111-1111-1111-111111111111', 'message',
+     v_msg, 'inappropriate', 'بيحاول ياخد المعاملة بره التطبيق');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- المستخدم العادي مايشوفش الطابور
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+
+do $$
+declare
+  blocked boolean := false;
+  res jsonb;
+begin
+  begin
+    perform * from public.report_queue_page(10);
+  exception when insufficient_privilege then
+    blocked := true;
+  end;
+  perform public.assert_true(blocked, 'طابور البلاغات للطاقم بس');
+
+  res := public.moderation_report(30);
+  perform public.assert_eq(res->>'error', 'not_authorized',
+    'وتقرير الدقة كمان');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+-- -----------------------------------------------------------------------------
+-- المراجعة
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare
+  n     int;
+  row_  record;
+  res   jsonb;
+begin
+  select count(*)::int into n from public.report_queue_page(50);
+  -- بلاغين على أحمد + بلاغ على الرسالة = 3 صفوف
+  perform public.assert_eq(n, 3, 'البلاغات ظهرت في الطابور');
+
+  -- بلاغات المنتجات مش هنا — بتظهر مع المنتج نفسه
+  select count(*)::int into n from public.report_queue_page(50)
+   where target_type = 'item';
+  perform public.assert_eq(n, 0,
+    'بلاغات المنتجات مش مكررة هنا — بتتحسم مع المنتج');
+
+  -- الأكتر بلاغات بيطلع الأول
+  select * into row_ from public.report_queue_page(50) limit 1;
+  perform public.assert_eq(row_.reports_on_target::int, 2,
+    'الهدف اللي عليه بلاغين طلع الأول');
+
+  -- وبيانات الهدف بتيجي معاه — المراجع مايقدرش يحكم من غيرها
+  select * into row_ from public.report_queue_page(50)
+   where target_type = 'message' limit 1;
+  perform public.assert_eq(row_.target->>'body',
+    'كلّمني على الرقم ده بره التطبيق',
+    'نص الرسالة المبلَّغ عنها ظاهر للمراجع');
+
+  -- ---------------------------------------------------------------------------
+  -- تعارض المصالح
+  -- ---------------------------------------------------------------------------
+  insert into public.reports (reporter_id, target_type, target_id, reason)
+  values ('33333333-3333-3333-3333-333333333333', 'user',
+          '11111111-1111-1111-1111-111111111111', 'harassment');
+
+  res := public.report_decide(
+    (select id from public.reports
+      where reporter_id = '33333333-3333-3333-3333-333333333333'
+        and target_type = 'user'
+        and target_id = '11111111-1111-1111-1111-111111111111'),
+    'warned', 'اختبار');
+  perform public.assert_eq(res->>'error', 'own_report',
+    'المراجعة ماتحكمش على بلاغ هي قدّمته');
+
+  -- الإجراء العقابي لازم معاه سبب
+  res := public.report_decide(
+    (select report_id from public.report_queue_page(50)
+      where target_type = 'message' limit 1),
+    'removed');
+  perform public.assert_eq(res->>'error', 'reason_required',
+    'الإخفاء لازم معاه سبب');
+
+  -- ---------------------------------------------------------------------------
+  -- إخفاء الرسالة — النص بيفضل للنزاعات
+  -- ---------------------------------------------------------------------------
+  res := public.report_decide(
+    (select report_id from public.report_queue_page(50)
+      where target_type = 'message' limit 1),
+    'removed', 'محاولة أخذ المعاملة بره التطبيق');
+  perform public.assert_true((res->>'ok')::boolean, 'الرسالة اتخفت');
+
+  -- ---------------------------------------------------------------------------
+  -- الإيقاف الدائم للأدمن بس
+  -- ---------------------------------------------------------------------------
+  res := public.report_decide(
+    (select report_id from public.report_queue_page(50)
+      where target_type = 'user' limit 1),
+    'banned', 'نصب متكرر', null);
+  perform public.assert_eq(res->>'error', 'admin_required',
+    'الإيقاف الدائم مش للمراجع العادي');
+
+  -- الإيقاف المؤقت مسموح
+  res := public.report_decide(
+    (select report_id from public.report_queue_page(50)
+      where target_type = 'user' limit 1),
+    'banned', 'نصب متكرر', 7);
+  perform public.assert_true((res->>'ok')::boolean, 'والمؤقت مسموح');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+do $$
+declare
+  m public.messages;
+  p public.profiles;
+  n int;
+begin
+  select * into m from public.messages where id = (select id from t_msg);
+  perform public.assert_true(m.removed_at is not null, 'الرسالة معلّمة كمخفية');
+  perform public.assert_eq(m.body, 'كلّمني على الرقم ده بره التطبيق',
+    'ونصها اتحفظ — السجل ده بيتستعمل في النزاعات');
+
+  select * into p from public.profiles
+   where id = '22222222-2222-2222-2222-222222222222';
+  perform public.assert_true(p.is_banned, 'أحمد اتوقف');
+  perform public.assert_true(p.banned_until > now(), 'ومؤقتاً مش دايم');
+
+  -- كل البلاغات على نفس الهدف اتقفلت بقرار واحد
+  select count(*)::int into n from public.reports
+   where target_type = 'user'
+     and target_id = '22222222-2222-2222-2222-222222222222'
+     and status in ('open', 'reviewing');
+  perform public.assert_eq(n, 0,
+    'البلاغين على نفس الشخص اتقفلوا بقرار واحد');
+
+  perform public.assert_true(
+    exists (select 1 from public.notifications
+             where user_id = '22222222-2222-2222-2222-222222222222'
+               and title_ar like '%حسابك اتوقف%'),
+    'وأحمد اتبلّغ بالسبب');
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- تقرير الدقة
+-- -----------------------------------------------------------------------------
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+
+do $$
+declare
+  rep jsonb;
+begin
+  rep := public.moderation_report(30);
+  perform public.assert_true((rep->>'ok')::boolean, 'التقرير متاح للمراجعة');
+
+  -- من القسم 19: قرار واحد على منتج، وكان رفض
+  perform public.assert_eq((rep->>'decisions')::int, 1,
+    'قرار واحد على منتج');
+  perform public.assert_eq((rep->>'rejected')::int, 1, 'وكان رفض');
+
+  -- معدل التعليم الخاطئ = المنتجات اللي الموديل علّمها والمراجع وافق
+  -- عليها. صفر هنا لأن الوحيد اللي اتحكم عليه اترفض.
+  perform public.assert_eq((rep->>'false_flag_rate')::numeric, 0::numeric,
+    'معدل التعليم الخاطئ صفر — الموديل كان محق');
+
+  perform public.assert_true(
+    (rep->>'median_wait_minutes') is not null,
+    'وزمن الرد الوسيط محسوب');
+
+  perform public.assert_true(
+    jsonb_array_length(rep->'by_moderator') >= 1,
+    'والإنتاجية لكل مراجع');
+
+  perform public.assert_eq((rep->>'reports_handled')::int, 2,
+    'وقرارات البلاغات متعدّة لوحدها');
+end $$;
+
+reset role;
+reset request.jwt.claim.sub;
+
+
 do $$ begin raise notice E'\n✔ كل الاختبارات نجحت\n'; end $$;

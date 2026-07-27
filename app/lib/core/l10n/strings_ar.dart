@@ -508,4 +508,32 @@ const Map<String, String> kAr = {
 
   // صور المراجعة
   'mod.photosUnavailable': 'الصور مش متاحة دلوقتي — احكم بحذر أو أجّل الحالة',
+
+  // البلاغات وتقرير الدقة
+  'report.reason.inappropriate': 'محتوى مخالف',
+  'report.reason.scam': 'محاولة نصب',
+  'report.reason.prohibited_item': 'منتج ممنوع',
+  'report.reason.harassment': 'إساءة أو تحرش',
+  'report.reason.fake_account': 'حساب وهمي',
+  'report.reason.other': 'سبب آخر',
+  'reports.title': 'بلاغات المستخدمين',
+  'reports.empty': 'مفيش بلاغات مفتوحة',
+  'reports.emptyBody': 'كل البلاغات اتحسمت.',
+  'reports.footer': 'بلاغات المنتجات بتتحسم مع المنتج نفسه في طابور المراجعة.',
+  'reports.count': '{n} بلاغات',
+  'reports.said': '{name}: {text}',
+  'reports.reasonHint': 'السبب بيتسجّل في السجل، وبيتبعت للمستخدم لو فيه عقوبة.',
+  'reports.action.dismissed': 'البلاغ مش في محله',
+  'reports.action.warned': 'تنبيه للمستخدم',
+  'reports.action.removed': 'إخفاء الرسالة',
+  'reports.action.banned': 'إيقاف الحساب',
+  'mod.err.ownReport': 'مينفعش تحكم على بلاغ إنت طرف فيه',
+  'mod.err.adminOnly': 'الإيقاف الدائم للأدمن بس',
+  'acc.title': 'دقة الفحص الآلي — آخر 30 يوم',
+  'acc.falseFlag': 'من المنتجات المعلّمة اتوافق عليها',
+  'acc.falseFlagHint': 'الرقم العالي معناه إن الفحص بيهدر وقتكم على منتجات سليمة. والصفر معناه غالباً إنه متساهل زيادة.',
+  'acc.decisions': '{n} قرار',
+  'acc.median': 'الوسيط {n} دقيقة',
+  'acc.p90': 'الأسوأ {n} دقيقة',
+  'acc.reports': '{n} بلاغ',
 };

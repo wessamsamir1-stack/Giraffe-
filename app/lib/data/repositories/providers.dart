@@ -197,3 +197,11 @@ final moderationQueueProvider =
     FutureProvider.family<List<QueueEntry>, FlagKind>((ref, kind) {
   return ref.watch(moderationRepositoryProvider).queue(kind: kind);
 });
+
+final reportsQueueProvider = FutureProvider<List<ReportEntry>>((ref) {
+  return ref.watch(moderationRepositoryProvider).reports();
+});
+
+final accuracyReportProvider = FutureProvider<AccuracyReport?>((ref) {
+  return ref.watch(moderationRepositoryProvider).accuracyReport();
+});

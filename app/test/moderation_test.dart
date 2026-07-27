@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:giraffe/core/l10n/strings.dart';
 import 'package:giraffe/data/repositories/moderation_repository.dart';
 import 'package:giraffe/features/moderation/moderation_queue_screen.dart';
+import 'package:giraffe/features/moderation/reports_queue_screen.dart';
 
 Future<void> pumpQueue(WidgetTester tester, {double textScale = 1.0}) async {
   tester.view.physicalSize = const Size(1080, 2340);
@@ -118,6 +119,81 @@ void main() {
       });
 
       expect(entry.photos, isEmpty);
+    });
+  });
+
+  group('طابور البلاغات', () {
+    Future<void> pumpReports(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            locale: Locale('ar'),
+            supportedLocales: S.supported,
+            localizationsDelegates: [
+              GLocalizationsDelegate(),
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: ReportsQueueScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+    }
+
+    testWidgets('بيرسم من غير استثناءات', (tester) async {
+      await pumpReports(tester);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('نص الرسالة المبلَّغ عنها ظاهر', (tester) async {
+      // المراجع مايقدرش يحكم على رسالة من غير ما يقراها.
+      await pumpReports(tester);
+      expect(find.text('كلّمني على الرقم ده بره التطبيق'), findsOneWidget);
+    });
+
+    testWidgets('عدد البلاغات على نفس الهدف بيتعرض', (tester) async {
+      // أقوى إشارة عندنا: تلات ناس مختلفين بلّغوا مش صدفة.
+      await pumpReports(tester);
+      expect(find.textContaining('3'), findsWidgets);
+    });
+
+    testWidgets('الرسالة بتاخد «إخفاء» والمستخدم بياخد «إيقاف»', (tester) async {
+      // الإجراء لازم يكون مناسب للهدف — مينفعش نعرض «إيقاف الحساب»
+      // على رسالة.
+      await pumpReports(tester);
+      expect(find.text('إخفاء الرسالة'), findsOneWidget);
+      expect(find.text('إيقاف الحساب'), findsOneWidget);
+    });
+  });
+
+  group('تقرير الدقة', () {
+    test('معدل التعليم الخاطئ بيتقرا من القاعدة', () {
+      final report = AccuracyReport.fromMap({
+        'decisions': 40,
+        'approved': 14,
+        'rejected': 26,
+        'false_flag_rate': 0.35,
+        'median_wait_minutes': 42,
+        'p90_wait_minutes': 310,
+        'reports_handled': 9,
+      });
+
+      expect(report.falseFlagRate, closeTo(0.35, 0.001));
+      expect(report.decisions, 40);
+      expect(report.p90WaitMinutes, 310);
+    });
+
+    test('التقرير الفاضي مابيرميش', () {
+      final report = AccuracyReport.fromMap({});
+      expect(report.decisions, 0);
+      expect(report.falseFlagRate, isNull);
     });
   });
 
