@@ -1,0 +1,12 @@
+# ربط Supabase المحلي — بيحتوي على مرجع المشروع السحابي
+supabase/.temp/
+supabase/.branches/
+
+# أسرار محلية
+.env
+.env.local
+*.env
+
+# نظام التشغيل
+.DS_Store
+Thumbs.db
