@@ -34,6 +34,17 @@ class AppPalette {
   static const Color black = Color(0xFF121212);
   static const Color trueBlack = Color(0xFF0A0A0A);
 
+  // ------------------------------------------------- خلفية الشريط الإخباري
+  //
+  // الرمادي ده شغّال كـ**فاصل**: الكروت بيضا، والفراغ اللي بينها
+  // هو اللي بيفصلها — مش خط ولا إطار.
+  //
+  // لازم يبقى فاتح كفاية إنه يقرا كـ«خلفية» مش كـ«سطح تاني»، وغامق
+  // كفاية إن الأبيض يبان فوقه. القيم دي مختارة على الحدّ ده بالظبط.
+  static const Color canvas = Color(0xFFEFF1F4);
+  static const Color canvasDark = Color(0xFF17181A);
+  static const Color surfaceDark = Color(0xFF242526);
+
   // ---------------------------------------------------------------- Semantic
   static const Color success = Color(0xFF28C76F);
   static const Color successSoft = Color(0xFFE6F9EF);
@@ -112,7 +123,7 @@ class GColors extends ThemeExtension<GColors> {
     brand: AppPalette.orange500,
     brandSoft: AppPalette.orange50,
     onBrand: AppPalette.white,
-    background: AppPalette.gray50,
+    background: AppPalette.canvas,
     surface: AppPalette.white,
     surfaceAlt: AppPalette.gray100,
     surfaceSunken: AppPalette.gray200,
@@ -135,10 +146,10 @@ class GColors extends ThemeExtension<GColors> {
     brand: AppPalette.orange400,
     brandSoft: Color(0xFF2A1B0C),
     onBrand: AppPalette.black,
-    background: AppPalette.trueBlack,
-    surface: AppPalette.gray900,
-    surfaceAlt: AppPalette.gray800,
-    surfaceSunken: Color(0xFF141414),
+    background: AppPalette.canvasDark,
+    surface: AppPalette.surfaceDark,
+    surfaceAlt: Color(0xFF3A3B3C),
+    surfaceSunken: Color(0xFF1C1D1F),
     border: Color(0xFF2E2E2E),
     borderStrong: Color(0xFF3D3D3D),
     textPrimary: Color(0xFFF5F5F5),

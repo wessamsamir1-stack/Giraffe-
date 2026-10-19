@@ -122,9 +122,9 @@ class _ModerationQueueScreenState extends ConsumerState<ModerationQueueScreen> {
             queue.when(
               loading: () => const Column(
                 children: [
-                  GSkeleton(height: 108, radius: GRadius.brLg),
+                  GSkeleton(height: 108, radius: GRadius.brCard),
                   SizedBox(height: GSpace.md),
-                  GSkeleton(height: 108, radius: GRadius.brLg),
+                  GSkeleton(height: 108, radius: GRadius.brCard),
                 ],
               ),
               error: (_, __) => GEmptyState(

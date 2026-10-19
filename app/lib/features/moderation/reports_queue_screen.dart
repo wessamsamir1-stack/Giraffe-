@@ -32,9 +32,9 @@ class ReportsQueueScreen extends ConsumerWidget {
             queue.when(
               loading: () => const Column(
                 children: [
-                  GSkeleton(height: 120, radius: GRadius.brLg),
+                  GSkeleton(height: 120, radius: GRadius.brCard),
                   SizedBox(height: GSpace.md),
-                  GSkeleton(height: 120, radius: GRadius.brLg),
+                  GSkeleton(height: 120, radius: GRadius.brCard),
                 ],
               ),
               error: (_, __) => GEmptyState(

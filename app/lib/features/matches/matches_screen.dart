@@ -104,11 +104,11 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
       AsyncLoading() => ListView(
           padding: const EdgeInsets.all(GSpace.screenH),
           children: const [
-            GSkeleton(height: 96, radius: GRadius.brLg),
+            GSkeleton(height: 96, radius: GRadius.brCard),
             SizedBox(height: GSpace.md),
-            GSkeleton(height: 96, radius: GRadius.brLg),
+            GSkeleton(height: 96, radius: GRadius.brCard),
             SizedBox(height: GSpace.md),
-            GSkeleton(height: 96, radius: GRadius.brLg),
+            GSkeleton(height: 96, radius: GRadius.brCard),
           ],
         ),
       AsyncError() => GEmptyState(

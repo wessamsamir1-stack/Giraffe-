@@ -128,7 +128,7 @@ class ItemCard extends StatelessWidget {
     return GSurface(
       onTap: onTap,
       padding: EdgeInsets.zero,
-      radius: GRadius.brLg,
+      radius: GRadius.brCard,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -146,7 +146,7 @@ class ItemCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(GRadius.lg),
+                    top: Radius.circular(GRadius.card),
                   ),
                   child: GImagePlaceholder(
                     seed: item.imageSeed,

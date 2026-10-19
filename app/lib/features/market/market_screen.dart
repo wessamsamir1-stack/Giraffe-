@@ -148,8 +148,8 @@ class MarketScreen extends ConsumerWidget {
                 gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  crossAxisSpacing: GSpace.md,
-                  mainAxisSpacing: GSpace.md,
+                  crossAxisSpacing: GSpace.sm,
+                  mainAxisSpacing: GSpace.sm,
                   childAspectRatio: 0.66,
                 ),
                 delegate: SliverChildBuilderDelegate(
@@ -225,7 +225,7 @@ class _MarketSkeleton extends StatelessWidget {
           for (var i = 0; i < 3; i++)
             const Padding(
               padding: EdgeInsets.only(bottom: GSpace.md),
-              child: GSkeleton(height: 120, radius: GRadius.brLg),
+              child: GSkeleton(height: 120, radius: GRadius.brCard),
             ),
         ],
       ),

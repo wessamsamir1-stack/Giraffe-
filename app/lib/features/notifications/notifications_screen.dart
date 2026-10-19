@@ -40,11 +40,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         AsyncLoading() => ListView(
             padding: const EdgeInsets.all(GSpace.screenH),
             children: const [
-              GSkeleton(height: 68, radius: GRadius.brLg),
+              GSkeleton(height: 68, radius: GRadius.brCard),
               SizedBox(height: GSpace.sm),
-              GSkeleton(height: 68, radius: GRadius.brLg),
+              GSkeleton(height: 68, radius: GRadius.brCard),
               SizedBox(height: GSpace.sm),
-              GSkeleton(height: 68, radius: GRadius.brLg),
+              GSkeleton(height: 68, radius: GRadius.brCard),
             ],
           ),
         AsyncError() => GEmptyState(

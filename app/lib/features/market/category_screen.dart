@@ -116,10 +116,10 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen> {
                     mainAxisSpacing: GSpace.md,
                     childAspectRatio: 0.66,
                     children: const [
-                      GSkeleton(radius: GRadius.brLg),
-                      GSkeleton(radius: GRadius.brLg),
-                      GSkeleton(radius: GRadius.brLg),
-                      GSkeleton(radius: GRadius.brLg),
+                      GSkeleton(radius: GRadius.brCard),
+                      GSkeleton(radius: GRadius.brCard),
+                      GSkeleton(radius: GRadius.brCard),
+                      GSkeleton(radius: GRadius.brCard),
                     ],
                   )
                 : items.isEmpty

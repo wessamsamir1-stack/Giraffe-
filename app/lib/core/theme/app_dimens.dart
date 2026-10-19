@@ -17,7 +17,11 @@ class GSpace {
   static const double giant = 56;
 
   /// الهامش الأفقي القياسي للشاشات.
-  static const double screenH = 20;
+  ///
+  /// ١٢ مش ٢٠. الهامش الواسع بيقول «المحتوى ده مؤطّر ومرتّب»، والضيق
+  /// بيقول «المحتوى ده كتير وبيكمّل». التاني هو اللي بيناسب شريط
+  /// إخباري بيتقلّب فيه، وهو اللي فيسبوك مبني عليه.
+  static const double screenH = 12;
 }
 
 /// أنصاف الأقطار — التطبيق كله دائري الحواف.
@@ -31,6 +35,15 @@ class GRadius {
   static const double xl = 24;
   static const double xxl = 32;
   static const double pill = 999;
+
+  /// نصف قطر الكروت في الشريط الإخباري.
+  ///
+  /// ٨ مش ١٨. الفرق مش تفصيلة: الحواف الكبيرة بتخلي كل كارت يقرا
+  /// كـ«عنصر عايم لوحده»، والصغيرة بتخليهم يقروا كـ«أعمدة في جدول
+  /// واحد». والتاني هو اللي بيخلي القايمة الطويلة مريحة.
+  static const double card = 8;
+
+  static const BorderRadius brCard = BorderRadius.all(Radius.circular(card));
 
   static const BorderRadius brXs = BorderRadius.all(Radius.circular(xs));
   static const BorderRadius brSm = BorderRadius.all(Radius.circular(sm));

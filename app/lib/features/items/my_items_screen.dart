@@ -133,12 +133,12 @@ class _ItemsSkeleton extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(GSpace.screenH),
       children: [
-        const GSkeleton(height: 74, radius: GRadius.brLg),
+        const GSkeleton(height: 74, radius: GRadius.brCard),
         const SizedBox(height: GSpace.xl),
         for (var i = 0; i < 3; i++)
           const Padding(
             padding: EdgeInsets.only(bottom: GSpace.md),
-            child: GSkeleton(height: 92, radius: GRadius.brLg),
+            child: GSkeleton(height: 92, radius: GRadius.brCard),
           ),
       ],
     );

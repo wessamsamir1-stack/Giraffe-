@@ -13,9 +13,9 @@ class GSurface extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(GSpace.lg),
-    this.radius = GRadius.brLg,
+    this.radius = GRadius.brCard,
     this.color,
-    this.bordered = true,
+    this.bordered = false,
     this.elevated = false,
     this.onTap,
   });
@@ -33,12 +33,17 @@ class GSurface extends StatelessWidget {
     final c = context.colors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // الكارت الافتراضي بقى بلا إطار وبلا ظل.
+    //
+    // اللي بيفصل الكروت عن بعض هو الخلفية الرمادية الظاهرة بينها.
+    // ولما يبقى فيه فاصل شغّال، الإطار بيبقى تكرار — وتلات طبقات
+    // فصل (فراغ + إطار + ظل) بتخلي الشاشة تحس مزدحمة من غير سبب.
     final content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? c.surface,
         borderRadius: radius,
-        border: bordered ? Border.all(color: c.border, width: 1.2) : null,
+        border: bordered ? Border.all(color: c.border, width: 1) : null,
         boxShadow: elevated ? GShadow.card(isDark) : null,
       ),
       child: child,
