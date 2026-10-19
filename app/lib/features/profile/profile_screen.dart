@@ -54,7 +54,11 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: GSpace.xxxl),
+        // الحشو جوّه القايمة مش حواليها — عشان المحتوى يعدّي **من
+        // ورا** شريط التبويبات المغبّش بدل ما يقف عنده.
+        padding: EdgeInsets.only(
+          bottom: GSpace.xxxl + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
           Padding(
             padding: const EdgeInsets.all(GSpace.screenH),

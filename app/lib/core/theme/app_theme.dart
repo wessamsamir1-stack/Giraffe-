@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
+import 'app_dimens.dart';
+import 'app_interaction.dart';
 import 'app_typography.dart';
 
 /// بناء ثيم التطبيق.
@@ -44,7 +46,11 @@ class AppTheme {
       fontFamily: family,
       scaffoldBackgroundColor: colors.background,
       canvasColor: colors.surface,
-      splashFactory: InkSparkle.splashFactory,
+      // على iOS مفيش موجة حبر. أي حاجة بتعمل ripple هناك بتحس
+      // إنها مستوردة من أندرويد.
+      splashFactory:
+          isApplePlatform ? NoSplash.splashFactory : InkSparkle.splashFactory,
+      pageTransitionsTheme: pageTransitions,
       textTheme: textTheme,
       colorScheme: ColorScheme(
         brightness: brightness,
@@ -70,6 +76,24 @@ class AppTheme {
             : SystemUiOverlayStyle.dark,
       ),
       dividerColor: colors.border,
+      // الفواصل على أبل شعرة فعلاً — بكسل واحد فيزيائي مش منطقي.
+      dividerTheme: DividerThemeData(
+        color: colors.border,
+        thickness: isApplePlatform ? 0.5 : 1,
+        space: isApplePlatform ? 0.5 : 1,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: colors.surface,
+        shape: const RoundedRectangleBorder(borderRadius: GRadius.sheet),
+        clipBehavior: Clip.antiAlias,
+        showDragHandle: true,
+        dragHandleColor: colors.border,
+        dragHandleSize: const Size(36, 4),
+        elevation: 0,
+        modalElevation: 0,
+      ),
       iconTheme: IconThemeData(color: colors.textSecondary),
       extensions: <ThemeExtension<dynamic>>[colors],
     );

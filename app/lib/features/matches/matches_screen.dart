@@ -80,12 +80,17 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _pane(context, active, archived: false),
-          _pane(context, archived, archived: true),
-        ],
+      // `top: false` لأن الـ AppBar خد نصيبه فوق خلاص. اللي محتاجينه
+      // هنا هو الحشو اللي شريط التبويبات حجزه في MediaQuery.
+      body: SafeArea(
+        top: false,
+        child: TabBarView(
+          controller: _tabs,
+          children: [
+            _pane(context, active, archived: false),
+            _pane(context, archived, archived: true),
+          ],
+        ),
       ),
     );
   }

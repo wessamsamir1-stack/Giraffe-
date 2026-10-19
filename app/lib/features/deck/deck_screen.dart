@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +6,7 @@ import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_interaction.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/providers.dart';
 import '../../widgets/g_button.dart';
@@ -52,7 +52,10 @@ class _DeckScreenState extends ConsumerState<DeckScreen> {
     final card = _top;
     if (card == null || _busy) return;
 
-    HapticFeedback.lightImpact();
+    // الإعجاب والتجاهل مش نفس الوزن، فمايصحّش يبقى ليهم نفس
+    // الاهتزاز. الإعجاب قرار، والتجاهل مجرد تقليب.
+    (intent == SwipeIntent.skip ? GHaptic.selection : GHaptic.impactLight)
+        .fire();
 
     setState(() {
       _busy = true;
@@ -83,6 +86,9 @@ class _DeckScreenState extends ConsumerState<DeckScreen> {
     ref.invalidate(swipeQuotaProvider);
 
     if (result.matched && result.matchId != null) {
+      // التطابق هو الحدث الوحيد اللي يستاهل اهتزاز محسوس — لو كل
+      // حاجة بتهتز بنفس القوة، مفيش حاجة بتبقى مميزة.
+      GHaptic.impactMedium.fire();
       await context.push(R.matchCelebrate(result.matchId!));
       if (mounted) ref.invalidate(matchesProvider);
     }
@@ -93,7 +99,7 @@ class _DeckScreenState extends ConsumerState<DeckScreen> {
 
   Future<void> _undo() async {
     if (_history.isEmpty || _busy) return;
-    HapticFeedback.selectionClick();
+    GHaptic.selection.fire();
 
     setState(() => _busy = true);
     final ok = await ref.read(deckRepositoryProvider).undo();

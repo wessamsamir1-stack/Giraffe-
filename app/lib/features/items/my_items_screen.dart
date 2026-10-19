@@ -50,9 +50,12 @@ class MyItemsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(myItemsProvider),
-        child: child,
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          onRefresh: () async => ref.invalidate(myItemsProvider),
+          child: child,
+        ),
       ),
     );
   }

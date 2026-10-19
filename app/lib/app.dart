@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'core/app_state.dart';
 import 'core/l10n/strings.dart';
 import 'core/router/app_router.dart';
+import 'core/theme/app_interaction.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/providers.dart';
 import 'data/repositories/push_repository.dart';
@@ -28,8 +30,28 @@ class _GiraffeAppState extends ConsumerState<GiraffeApp> {
   @override
   void initState() {
     super.initState();
+    _goEdgeToEdge();
     // بعد أول إطار عشان الـ router يكون جاهز للتوجيه
     WidgetsBinding.instance.addPostFrameCallback((_) => _initPush());
+  }
+
+  /// التطبيق بيرسم تحت شريط الحالة وشريط التنقل.
+  ///
+  /// من غير ده بيبقى فيه شريطين رماديين فوق وتحت على أندرويد —
+  /// وهي أوضح علامة على إن التطبيق مش متظبط على الجهاز.
+  ///
+  /// الشرائط نفسها بتبقى شفافة، والمحتوى بيتحمي بـ `SafeArea` جوّه
+  /// الشاشات. الأيقونات بتتلوّن من `AppBarTheme` حسب الوضع.
+  void _goEdgeToEdge() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+      ),
+    );
   }
 
   Future<void> _initPush() async {
@@ -77,6 +99,7 @@ class _GiraffeAppState extends ConsumerState<GiraffeApp> {
       theme: AppTheme.light(locale),
       darkTheme: AppTheme.dark(locale),
       themeMode: themeMode,
+      scrollBehavior: const GScrollBehavior(),
       builder: (context, child) {
         // تثبيت حجم الخط في حدود معقولة عشان التصميم ما يتكسرش
         // مع إعدادات الإتاحة القصوى، مع احترام تكبير المستخدم.

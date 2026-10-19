@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/l10n/strings.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_dimens.dart';
+import '../core/theme/app_interaction.dart';
 import '../data/models/models.dart';
 import 'g_button.dart';
 
@@ -45,14 +46,7 @@ class GSurface extends StatelessWidget {
 
     if (onTap == null) return content;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: content,
-      ),
-    );
+    return GPressable(onTap: onTap, radius: radius, child: content);
   }
 }
 
@@ -122,7 +116,13 @@ class GChip extends StatelessWidget {
     );
 
     if (onTap == null) return chip;
-    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: chip);
+    // الشرايح صغيرة، فالانكماش بتاعها لازم يبقى أوضح عشان يتحس.
+    return GPressable(
+      onTap: onTap,
+      radius: GRadius.brPill,
+      scale: 0.94,
+      child: chip,
+    );
   }
 }
 
@@ -465,11 +465,14 @@ class GSettingsTile extends StatelessWidget {
     final c = context.colors;
     final color = danger ? c.danger : c.textPrimary;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
+    return GPressable(
+      onTap: onTap,
+      radius: BorderRadius.zero,
+      // صفوف القوايم مابتنكمشش — الصف الواقف جنب صفوف تانية لو
+      // اتزنق بيبان إنه اتفصل عنهم. الـ ripple على أندرويد
+      // والاهتزاز على الاتنين بيكفّوا.
+      scale: 1,
+      child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: GSpace.lg,
             vertical: GSpace.md,
@@ -511,7 +514,6 @@ class GSettingsTile extends StatelessWidget {
                   ),
             ],
           ),
-        ),
       ),
     );
   }

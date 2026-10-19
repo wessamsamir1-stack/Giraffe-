@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -5,6 +7,7 @@ import '../../core/l10n/strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_interaction.dart';
 
 /// الهيكل الرئيسي — 5 تبويبات.
 ///
@@ -30,6 +33,9 @@ class MainShell extends StatelessWidget {
   ];
 
   void _onTap(int index) {
+    // الاهتزاز قبل التنقل مش بعده — عشان يتزامن مع رفع الصباع
+    // مش مع رسم الشاشة الجديدة.
+    GHaptic.selection.fire();
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -41,8 +47,22 @@ class MainShell extends StatelessWidget {
     final c = context.colors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // الشريط بقى عايم فوق المحتوى، يبقى لازم الشاشات تعرف إنه موجود.
+    //
+    // بنزوّد ارتفاعه على `padding.bottom` بتاع الشاشة، فأي `SafeArea`
+    // أو `ListView` بيقرأ الحشو من `MediaQuery` بيحجز المكان لوحده.
+    // من غير السطور دي آخر عنصر في أي قايمة بيتغطّى.
+    final media = MediaQuery.of(context);
+    final barInset = media.padding.bottom + GSize.navBarHeight;
+
     return Scaffold(
-      body: navigationShell,
+      body: MediaQuery(
+        data: media.copyWith(
+          padding: media.padding.copyWith(bottom: barInset),
+          viewPadding: media.viewPadding.copyWith(bottom: barInset),
+        ),
+        child: navigationShell,
+      ),
       floatingActionButton: navigationShell.currentIndex == 3
           ? FloatingActionButton.extended(
               onPressed: () => context.push(R.addItem),
@@ -52,30 +72,42 @@ class MainShell extends StatelessWidget {
               label: Text(context.tr('items.add')),
             )
           : null,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: c.surface,
-          border: Border(top: BorderSide(color: c.border)),
-          boxShadow: GShadow.soft(isDark),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: GSize.navBarHeight,
-            child: Row(
-              children: [
-                for (var i = 0; i < _items.length; i++)
-                  Expanded(
-                    child: _NavItem(
-                      icon: _items[i].icon,
-                      activeIcon: _items[i].active,
-                      label: context.tr(_items[i].key),
-                      selected: navigationShell.currentIndex == i,
-                      badge: i == 2 ? 2 : null,
-                      onTap: () => _onTap(i),
-                    ),
-                  ),
-              ],
+      // الشريط شبه شفاف والمحتوى بيعدّي من وراه مغبّش.
+      //
+      // ده مش تزويق: الشريط المصمت بيقطع الشاشة لنُصين وبيخلي
+      // القايمة تحسّ إنها بتنتهي عنده. الضبابية بتخلي العين تفهم
+      // إن فيه محتوى كمان تحت — فالمستخدم بيكمّل تمرير.
+      extendBody: true,
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: c.surface.withOpacity(isDark ? 0.72 : 0.82),
+              border: Border(
+                top: BorderSide(color: c.border, width: isApplePlatform ? 0.5 : 1),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: GSize.navBarHeight,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _items.length; i++)
+                      Expanded(
+                        child: _NavItem(
+                          icon: _items[i].icon,
+                          activeIcon: _items[i].active,
+                          label: context.tr(_items[i].key),
+                          selected: navigationShell.currentIndex == i,
+                          badge: i == 2 ? 2 : null,
+                          onTap: () => _onTap(i),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -110,7 +142,11 @@ class _NavItem extends StatelessWidget {
       selected: selected,
       button: true,
       label: label,
-      child: InkWell(
+      // مش `InkWell`: الموجة كانت بتتمدّ على عرض التبويب كله.
+      // التبويب مش زرار، هو مؤشّر مكان — فالرد المناسب هو الأيقونة
+      // نفسها بتكبر، مش خلفية بتتلوّن.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -155,12 +191,15 @@ class _NavItem extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 3),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            AnimatedDefaultTextStyle(
+              duration: GDuration.fast,
+              curve: GCurve.standard,
+              style: Theme.of(context).textTheme.labelSmall!.copyWith(
                     color: color,
                     fontSize: 10.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
+              child: Text(label),
             ),
           ],
         ),
