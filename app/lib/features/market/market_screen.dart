@@ -64,7 +64,7 @@ class MarketScreen extends ConsumerWidget {
                     }
                     final category = Categories.featured[i];
                     return SizedBox(
-                      width: 92,
+                      width: CategoryTile.tileWidth,
                       child: CategoryTile(
                         category: category,
                         onTap: () => context.push(R.category(category.id)),
@@ -343,7 +343,7 @@ class _MoreCategoriesTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return SizedBox(
-      width: 92,
+      width: CategoryTile.tileWidth,
       child: GSurface(
         onTap: onTap,
         padding: const EdgeInsets.all(GSpace.sm),
