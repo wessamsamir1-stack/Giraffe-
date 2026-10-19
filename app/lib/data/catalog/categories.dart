@@ -150,7 +150,7 @@ class Categories {
 
   static const gaming = Category(
     id: 'gaming',
-    nameAr: 'ألعاب وأجهزة ألعاب',
+    nameAr: 'ألعاب وأجهزتها',
     nameEn: 'Gaming',
     icon: Icons.sports_esports_rounded,
     subs: [

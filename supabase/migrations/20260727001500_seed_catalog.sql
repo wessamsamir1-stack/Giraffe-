@@ -16,7 +16,7 @@ values
   ('computers', 'كمبيوتر ولابتوب', 'Computers & Laptops', 'laptop_mac_rounded', false, false, false, 10),
   ('electronics', 'إلكترونيات وأجهزة', 'Electronics', 'tv_rounded', false, false, true, 20),
   ('cameras', 'كاميرات وتصوير', 'Cameras & Photography', 'photo_camera_rounded', false, false, false, 30),
-  ('gaming', 'ألعاب وأجهزة ألعاب', 'Gaming', 'sports_esports_rounded', false, false, true, 40),
+  ('gaming', 'ألعاب وأجهزتها', 'Gaming', 'sports_esports_rounded', false, false, true, 40),
   ('vehicles', 'سيارات ومركبات', 'Vehicles', 'directions_car_rounded', false, false, true, 50),
   ('furniture', 'أثاث ومفروشات', 'Furniture & Home', 'chair_rounded', false, false, true, 60),
   ('appliances', 'أجهزة منزلية', 'Home Appliances', 'kitchen_rounded', false, false, false, 70),
