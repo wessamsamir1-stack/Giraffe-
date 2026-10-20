@@ -1,0 +1,87 @@
+# =============================================================================
+# Giraffe — نشر نسخة الويب على GitHub Pages
+#
+# ليه: الآيفون مابيثبّتش APK، وأبل مابتسمحش بتطبيقات من بره متجرها من
+# غير حساب مطوّر. البديل اللي بيدّي نفس الإحساس هو «إضافة إلى الشاشة
+# الرئيسية» من Safari: أيقونة، وشاشة كاملة، من غير شريط عنوان.
+#
+# وده محتاج التطبيق على عنوان خاص بيه — مش جوّه claude.ai. الريبو عام،
+# فـ GitHub Pages ببلاش.
+#
+# العنوان: https://wessamsamir1-stack.github.io/Giraffe-/
+# =============================================================================
+name: Web
+
+on:
+  push:
+    branches: [main, claude/giraffe-app-spec-xj8m9b]
+    paths:
+      - 'app/**'
+      - '.github/workflows/web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# نشر واحد في المرة — والجديد بيلغي القديم.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: بناء الويب
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # --base-href: الموقع بيتنشر تحت /Giraffe-/ مش على الجذر.
+      # --no-web-resources-cdn: محرّك الرسم من نفس الموقع مش من سيرفر
+      #   جوجل — من غيره، لو الشبكة بطيئة أو محجوبة، التطبيق بيفضل شاشة
+      #   فاضية من غير أي رسالة.
+      - name: Build
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter build web --release \
+            --no-web-resources-cdn \
+            --base-href /Giraffe-/ \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          # مش بيتسجّل (القالب في web/flutter_bootstrap.js مابيمرّرش
+          # إعداداته)، بس بنشيله عشان مايتسجّلش بالغلط في أي وقت.
+          rm -f build/web/flutter_service_worker.js
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/build/web
+
+  deploy:
+    name: نشر
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

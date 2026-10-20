@@ -1,20 +1,30 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
-  <!--
-    إذا اتبنى التطبيق تحت مسار فرعي، شغّل:
-    flutter build web --base-href /مسارك/
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!--
+    user-scalable=no: من غيرها الآيفون بيكبّر الصفحة لو المستخدم دوس
+    مرتين بسرعة — وده أوضح علامة إن «ده موقع» مش تطبيق.
+    viewport-fit=cover: عشان نعرف مقاسات النوتش والشرطة اللي تحت
+    (env(safe-area-inset-*)) ونبعد عنهم بنفسنا.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Giraffe — Swipe. Match. Trade. شبكة مقايضة اجتماعية">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#F58220">
 
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#242526" media="(prefers-color-scheme: dark)">
+
+  <!--
+    «إضافة إلى الشاشة الرئيسية» على الآيفون.
+    capable=yes بيفتح التطبيق شاشة كاملة من غير Safari.
+    status-bar-style=default: شريط الساعة والبطارية بخط غامق على خلفية
+    فاتحة، والتطبيق بيبدأ **تحته** مش وراه.
+  -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Giraffe">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -24,11 +34,42 @@
   <title>Giraffe</title>
 
   <style>
-    /* شاشة تحميل بلون الهوية — عشان مانبصّش على أبيض فاضي لحد ما Flutter يقوم */
-    body { margin: 0; background: #F58220; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      /* الشريط اللي تحت الشرطة في الآيفونات الجديدة — بلون شريط
+         التبويبات عشان يبان امتداد ليه مش فراغ. */
+      background: #FFFFFF;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    @media (prefers-color-scheme: dark) {
+      html, body { background: #242526; }
+    }
+
+    /*
+      فلاتر بيترسم جوّه العنصر ده مش في الصفحة كلها.
+
+      السبب: فلاتر على الويب مابيعرفش مقاسات النوتش والشرطة اللي تحت —
+      بيبلّغ الحشو صفر. فشريط التبويبات كان هيترسم تحت الشرطة، والعنوان
+      تحت النوتش. فبنقصّ له المساحة الآمنة بنفسنا بـ CSS، وهو يترسم جوّاها.
+    */
+    #giraffe-host {
+      position: fixed;
+      top: env(safe-area-inset-top, 0px);
+      bottom: env(safe-area-inset-bottom, 0px);
+      left: env(safe-area-inset-left, 0px);
+      right: env(safe-area-inset-right, 0px);
+      background: #F58220;
+    }
   </style>
 </head>
 <body>
+  <div id="giraffe-host"></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

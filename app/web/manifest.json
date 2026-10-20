@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F58220",
-    "theme_color": "#F58220",
+    "theme_color": "#FFFFFF",
     "description": "Giraffe — Swipe. Match. Trade. شبكة مقايضة اجتماعية",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
@@ -31,5 +31,8 @@
             "type": "image/png",
             "purpose": "maskable"
         }
-    ]
+    ],
+    "scope": ".",
+    "lang": "ar",
+    "dir": "rtl"
 }
