@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 
 /// الخطوط.
 ///
-/// الإنجليزي: Inter
-/// العربي: IBM Plex Sans Arabic
+/// IBM Plex Sans Arabic للغتين. الخط ده فيه لاتيني كامل (IBM Plex Sans)
+/// مرسوم يتناسق مع العربي — نفس السُمك ونفس ارتفاع الحروف.
 ///
-/// لو ملفات الخطوط مش موجودة في assets، فلاتر بيرجع لخط النظام تلقائياً
-/// والتطبيق بيفضل شغال — الشكل بس هو اللي بيختلف.
+/// كان فيه خطّين (Inter للإنجليزي)، بس التطبيق مليان جمل عربي فيها
+/// أرقام وأسماء منتجات إنجليزي («آيفون 15 برو 256 جيجا»). بخطّين، كل
+/// كلمة إنجليزي جوّه الجملة كانت بتتغيّر شكلها وارتفاعها — والعين بتلقط
+/// ده كـ«حاجة مش متظبطة» حتى لو مش عارفة تسمّيها.
 class GFonts {
   const GFonts._();
 
-  static const String latin = 'Inter';
-  static const String arabic = 'IBMPlexSansArabic';
+  static const String family = 'IBMPlexSansArabic';
 
-  static String forLocale(Locale locale) =>
-      locale.languageCode == 'ar' ? arabic : latin;
+  static String forLocale(Locale locale) => family;
 }
 
 /// سلّم النصوص.

@@ -49,10 +49,34 @@ class Currency {
   }
 
   /// تنسيق مختصر بدون كسور — للاستخدام في الكروت الضيقة.
-  String formatCompact(num value, {required bool ar}) {
-    final rounded = value.round();
-    return ar ? '$rounded $symbolAr' : '$rounded $symbolEn';
+  String formatCompact(num value, {required bool ar}) =>
+      _isolate('${grouped(value)} ${ar ? symbolAr : symbolEn}');
+
+  /// نطاق سعر بعملة واحدة: «38,000 – 44,000 ج.م».
+  ///
+  /// كان بيتكتب «38000 ج.م – 44000 ج.م» جوّه نص LTR إجباري، فالمتصفح
+  /// والموبايل كانوا بيرتّبوه «ج.م – 44000 ج.م 38000»: العملة مكررة
+  /// ومتلخبطة مع الأرقام. ده أكتر سطر بيتشاف في التطبيق كله.
+  ///
+  /// دلوقتي العملة مرة واحدة في الآخر، والأرقام بفواصل آلاف، والجزء
+  /// الرقمي معزول باتجاه LTR (U+2066 … U+2069) عشان «الأقل – الأكثر»
+  /// يفضلوا بالترتيب ده جوّه جملة عربي.
+  String formatRange(num min, num max, {required bool ar}) =>
+      '\u2066${grouped(min)} – ${grouped(max)}\u2069 ${ar ? symbolAr : symbolEn}';
+
+  /// «38000» ← «38,000». أرقام لاتيني لأنها المستخدمة في الأسعار
+  /// في السوق المصري والخليجي على حد سواء.
+  static String grouped(num value) {
+    final digits = value.round().abs().toString();
+    final out = StringBuffer(value < 0 ? '-' : '');
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) out.write(',');
+      out.write(digits[i]);
+    }
+    return out.toString();
   }
+
+  static String _isolate(String s) => '\u2068$s\u2069';
 }
 
 class City {

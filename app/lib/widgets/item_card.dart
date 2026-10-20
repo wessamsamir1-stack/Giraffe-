@@ -45,20 +45,24 @@ class PriceRange extends StatelessWidget {
       );
     }
 
-    final range = compact
-        ? '${currency.formatCompact(min, ar: ar)} – ${currency.formatCompact(max, ar: ar)}'
-        : '${currency.formatCompact(min, ar: ar)} – ${currency.format(max, ar: ar)}';
+    final range = currency.formatRange(min, max, ar: ar);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           range,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: (compact
                   ? Theme.of(context).textTheme.titleSmall
                   : Theme.of(context).textTheme.titleLarge)
-              ?.copyWith(color: c.textPrimary),
-          textDirection: TextDirection.ltr,
+              ?.copyWith(
+            color: c.textPrimary,
+            // الأرقام بعرض ثابت — عشان كروت جنب بعض أسعارها تبان
+            // متصفّة، مش كل رقم بعرض مختلف.
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
         ),
         if (showSource) ...[
           const SizedBox(height: 2),

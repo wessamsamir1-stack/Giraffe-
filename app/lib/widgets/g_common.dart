@@ -629,32 +629,62 @@ class GImagePlaceholder extends StatelessWidget {
   final IconData? icon;
   final BorderRadius radius;
 
-  static const List<List<Color>> _gradients = [
-    [Color(0xFFFFE3CC), Color(0xFFFFC79A)],
-    [Color(0xFFDCE9FF), Color(0xFFB9D2FF)],
-    [Color(0xFFE9DCFF), Color(0xFFCDB6FF)],
-    [Color(0xFFD8F5E4), Color(0xFFAEE9C7)],
-    [Color(0xFFFFE0E0), Color(0xFFFFBDBD)],
-    [Color(0xFFD5F4F8), Color(0xFFA8E7EF)],
+  /// عائلة لون واحدة دافية بدرجات متقاربة.
+  ///
+  /// كانت ست ألوان باستيل مختلفة (برتقاني، أزرق، بنفسجي، أخضر، وردي،
+  /// تركواز). الشبكة كانت شكلها لوحة ألوان أطفال — وده عكس البريميوم
+  /// على طول الخط. التطبيقات الفاخرة بتختار درجة واحدة وتنوّع فيها
+  /// بخفة، فالعين تشوف «نظام» مش «عشوائية».
+  static const List<List<Color>> _light = [
+    [Color(0xFFF3EFEA), Color(0xFFE8E2DA)],
+    [Color(0xFFF1EEEA), Color(0xFFE4DFD8)],
+    [Color(0xFFF4F0EB), Color(0xFFEAE3DA)],
+    [Color(0xFFF0EDE9), Color(0xFFE2DDD6)],
+  ];
+
+  static const List<List<Color>> _dark = [
+    [Color(0xFF2C2B29), Color(0xFF23221F)],
+    [Color(0xFF2A2927), Color(0xFF21201E)],
+    [Color(0xFF2D2C29), Color(0xFF242320)],
+    [Color(0xFF2B2A28), Color(0xFF22211F)],
   ];
 
   @override
   Widget build(BuildContext context) {
-    final pair = _gradients[seed % _gradients.length];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final set = isDark ? _dark : _light;
+    final pair = set[seed % set.length];
+    final c = context.colors;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
         gradient: LinearGradient(
           colors: pair,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
       child: Center(
-        child: Icon(
-          icon ?? Icons.image_outlined,
-          size: 34,
-          color: Colors.black.withOpacity(0.18),
+        // الأيقونة جوّه دايرة زجاج — بتقرا كـ«مكان صورة مقصود» مش
+        // كـ«الصورة ماحمّلتش».
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: (isDark ? Colors.white : Colors.white)
+                .withOpacity(isDark ? 0.06 : 0.65),
+            border: Border.all(
+              color: (isDark ? Colors.white : Colors.black)
+                  .withOpacity(isDark ? 0.08 : 0.04),
+            ),
+          ),
+          child: Icon(
+            icon ?? Icons.image_outlined,
+            size: 24,
+            color: c.textTertiary,
+          ),
         ),
       ),
     );
