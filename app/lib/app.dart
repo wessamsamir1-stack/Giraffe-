@@ -108,11 +108,65 @@ class _GiraffeAppState extends ConsumerState<GiraffeApp> {
           minScaleFactor: 0.9,
           maxScaleFactor: 1.35,
         );
-        return MediaQuery(
-          data: media.copyWith(textScaler: scale),
-          child: child ?? const SizedBox.shrink(),
+        return _PhoneFrame(
+          child: MediaQuery(
+            data: media.copyWith(textScaler: scale),
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
+    );
+  }
+}
+
+/// إطار بعرض موبايل على الشاشات العريضة.
+///
+/// التطبيق مصمَّم للموبايل بس. على شاشة لابتوب كان بيتمطّ على
+/// ١٣٦٦ بكسل: شريط تبويبات بطول الشاشة، و«عرض الكل» بعيدة عن عنوانها
+/// بمتر، وكروت تايهة في فراغ — شكل موقع مكسور مش تطبيق.
+///
+/// فعلى أي شاشة أعرض من [_breakpoint]، التطبيق بيترسم في عمود بعرض
+/// موبايل في النص، والخلفية الرمادية حواليه. على الموبايل نفسه
+/// الويدجت دي بترجّع المحتوى زي ما هو من غير أي تغيير.
+///
+/// وبنعدّل `MediaQuery.size` كمان مش بس القيود — عشان أي ويدجت
+/// بتقرا عرض الشاشة من `MediaQuery` تاخد عرض الإطار مش عرض الشاشة.
+class _PhoneFrame extends StatelessWidget {
+  const _PhoneFrame({required this.child});
+
+  final Widget child;
+
+  /// أعرض موبايل شائع حوالي ٤٣٠. أي حاجة فوق ٦٠٠ تابلت أو كمبيوتر.
+  static const double _breakpoint = 600;
+  static const double _width = 430;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    if (media.size.width <= _breakpoint) return child;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final frameSize = Size(_width, media.size.height);
+
+    return ColoredBox(
+      color: isDark ? const Color(0xFF0E0F10) : const Color(0xFFDADDE1),
+      child: Center(
+        child: Container(
+          width: _width,
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.5 : 0.12),
+                blurRadius: 40,
+              ),
+            ],
+          ),
+          child: MediaQuery(
+            data: media.copyWith(size: frameSize),
+            child: child,
+          ),
+        ),
+      ),
     );
   }
 }
