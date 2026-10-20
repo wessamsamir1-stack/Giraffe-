@@ -31,6 +31,15 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
 
+# app_links بييجي مع supabase_flutter. من 6.4.0 بيقرا
+# `flutter.compileSdkVersion` جوّه build.gradle بتاعه، والامتداد ده
+# مش متاح للمكتبات في فلاتر 3.24 — فبناء أندرويد بيقع برسالة
+# «compileSdkVersion is not specified».
+#
+# 6.3.x بيكتب الرقم صريح. شيل السطر ده لما فلاتر يتحدّث.
+dependency_overrides:
+  app_links: ">=6.3.0 <6.4.0"
+
 flutter:
   uses-material-design: true
 
