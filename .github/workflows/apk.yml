@@ -1,0 +1,94 @@
+# =============================================================================
+# Giraffe — بناء تطبيق أندرويد
+#
+# بيطلّع ملف APK تقدر تنزّله على الموبايل وتفتحه من أيقونة زي أي تطبيق —
+# من غير متصفح ولا شريط عنوان.
+#
+# ليه هنا ومش على جهاز حد:
+# أدوات أندرويد حجمها كام جيجا، وتثبيتها على كل جهاز بيشتغل عليه حد
+# تكلفة مالهاش لازمة. سيرفرات GitHub فيها كل ده جاهز.
+#
+# الملف بيتحط في صفحة إصدار ثابتة اسمها apk-latest، فاللينك مابيتغيرش
+# مع كل بناء — نفس الرابط دايماً بيجيب آخر نسخة.
+# =============================================================================
+name: APK
+
+on:
+  push:
+    branches: [main, claude/giraffe-app-spec-xj8m9b]
+    paths:
+      - 'app/**'
+      - '.github/workflows/apk.yml'
+  workflow_dispatch:
+
+permissions:
+  # لازمة عشان ننشر الملف في صفحة الإصدار
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: بناء APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # المفاتيح اختيارية:
+      #   - لو مش متسجّلة في أسرار الريبو، التطبيق بيشتغل على البيانات
+      #     التجريبية (Env.hasBackend بيرجّع false).
+      #   - لو متسجّلة، بيتصل بسوبابيز الحقيقي.
+      #
+      # مفتاح anon عام بطبيعته — الحماية من سياسات الصفوف. ومفيش أي
+      # مفتاح تاني بيدخل هنا (القاعدة دي مكتوبة في Env).
+      - name: Build
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          cp build/app/outputs/flutter-apk/app-release.apk giraffe.apk
+          ls -la giraffe.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: giraffe-apk
+          path: app/giraffe.apk
+
+      - name: Publish to apk-latest
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Giraffe — أحدث نسخة أندرويد
+          prerelease: true
+          files: app/giraffe.apk
+          body: |
+            نسخة تجريبية من تطبيق Giraffe لأندرويد.
+
+            **التثبيت:**
+            1. نزّل `giraffe.apk` من تحت.
+            2. افتحه من الإشعارات أو من مجلد التنزيلات.
+            3. لو الموبايل سأل، اسمح بالتثبيت من المصدر ده.
+
+            الكوميت: ${{ github.sha }}
