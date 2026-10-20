@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  أيقونة تكيّفية (أندرويد 8+).
+
+  من غيرها، اللانشر في أندرويد 8 وأحدث بياخد الأيقونة المربعة القديمة
+  ويصغّرها جوّه دايرة بيضا — وده أوضح علامة على تطبيق مش متظبط.
+  دلوقتي النظام بيقص الخلفية البرتقاني بالشكل اللي يناسب الموبايل
+  (دايرة، مربع بحواف، قطرة) واللوجو فوقها.
+
+  monochrome: للأيقونات الملوّنة بثيم الموبايل في أندرويد 13+.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

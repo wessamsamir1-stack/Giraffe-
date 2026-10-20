@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- نفس AppPalette.orange500 في app_colors.dart -->
+    <color name="ic_launcher_background">#F58220</color>
+    <color name="brand">#F58220</color>
+</resources>

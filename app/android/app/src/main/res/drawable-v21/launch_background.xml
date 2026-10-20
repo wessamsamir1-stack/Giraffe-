@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+<!--
+  الشاشة اللي أندرويد بيعرضها لحد ما فلاتر يقوم.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+  كانت بيضا. فالتطبيق كان بيفتح: أبيض ← برتقاني (شاشة البداية بتاعة
+  فلاتر) — ومضة بيضا واضحة في كل فتحة. دلوقتي برتقاني باللوجو، فالانتقال
+  لشاشة فلاتر بيبقى سلس.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/brand" />
+    <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+            android:src="@drawable/launch_mark" />
+    </item>
 </layer-list>
