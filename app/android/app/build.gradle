@@ -25,9 +25,10 @@ android {
     defaultConfig {
         applicationId = "com.giraffe.app"
 
-        // 21 هو أدنى ما يقبله mobile_scanner. وده بيغطي أندرويد 5
-        // وأحدث — أي جهاز أقدم من كده مش هيشغّل التطبيق أصلاً.
-        minSdk = 21
+        // 23 = أندرويد 6 (2015). كان 21، بس androidx.camera:camera-core
+        // اللي جاية مع mobile_scanner بتطلب 23 كحد أدنى، والبناء
+        // بيقع في دمج الـ manifest من غيرها.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
